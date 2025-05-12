@@ -28,3 +28,4 @@ manifest.edn
 cljs-runtime
 ogres.app.js
 ogres.app.css
+.vscode/

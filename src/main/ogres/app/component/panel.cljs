@@ -1,4 +1,3 @@
-;; src/main/ogres/app/component/panel.cljs
 (ns ogres.app.component.panel
   (:require [ogres.app.component :refer [icon]]
             [ogres.app.component.panel-data :as data]
@@ -6,10 +5,7 @@
             [ogres.app.component.panel-lobby :as lobby]
             [ogres.app.component.panel-scene :as scene]
             [ogres.app.component.panel-tokens :as tokens]
-<<<<<<< Updated upstream
-=======
-            [ogres.app.component.panel-player-sheets :as player-sheets] ; <<< ADDED THIS REQUIRE
->>>>>>> Stashed changes
+            [ogres.app.component.panel-player-sheets :as player-sheets] ; 
             [ogres.app.hooks :as hooks]
             [uix.core :refer [defui $]]))
 
@@ -35,34 +31,11 @@
       ($ :button.button {:disabled true} status-icon "Status not known"))))
 
 (def ^:private panel-data
-<<<<<<< Updated upstream
   {:data       {:icon "wrench-adjustable-circle" :label "Manage local data"}
    :initiative {:icon "hourglass-split" :label "Initiative"}
    :lobby      {:icon "people-fill" :label "Online options"}
    :scene      {:icon "images" :label "Scene options"}
    :tokens     {:icon "person-circle" :label "Tokens"}})
-
-(def ^:private panel-forms
-  {:host [:tokens :scene :initiative :lobby :data]
-   :conn [:tokens :initiative :lobby]})
-
-(def ^:private components
-  {:data       {:form data/form}
-   :initiative {:form initiative/form :footer initiative/footer}
-   :lobby      {:form lobby/form :footer lobby/footer}
-   :scene      {:form scene/form}
-   :tokens     {:form tokens/form :footer tokens/footer}})
-=======
-  {:data          {:icon "wrench-adjustable-circle" :label "Manage local data"}
-   :initiative    {:icon "hourglass-split" :label "Initiative"}
-   :lobby         {:icon "people-fill" :label "Online options"}
-   :scene         {:icon "images" :label "Scene options"}
-   :tokens        {:icon "person-circle" :label "Tokens"}
-   :player-sheets {:icon "player-sheet" :label "Player Sheets"} ; <<< ADDED THIS ENTRY
-                   ;; Ensure you have an icon named "player-sheet" (i.e., id="icon-player-sheet")
-                   ;; in your icons.svg file. You could use "files" or "journal-bookmark-fill"
-                   ;; from your existing icons.svg if "player-sheet" isn't added yet.
-   })
 
 (def ^:private panel-forms
   {:host [:tokens :scene :initiative :lobby :data :player-sheets] ; <<< ADDED :player-sheets
@@ -75,7 +48,6 @@
    :scene         {:form scene/form}
    :tokens        {:form tokens/form :footer tokens/footer}
    :player-sheets {:form player-sheets/panel-root-component}}) ; <<< ADDED THIS ENTRY
->>>>>>> Stashed changes
 
 (def ^:private query
   [[:user/type :default :conn]
