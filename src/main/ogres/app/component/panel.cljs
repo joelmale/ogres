@@ -1,3 +1,4 @@
+;; src/main/ogres/app/component/panel.cljs
 (ns ogres.app.component.panel
   (:require [ogres.app.component :refer [icon]]
             [ogres.app.component.panel-data :as data]
@@ -5,6 +6,10 @@
             [ogres.app.component.panel-lobby :as lobby]
             [ogres.app.component.panel-scene :as scene]
             [ogres.app.component.panel-tokens :as tokens]
+<<<<<<< Updated upstream
+=======
+            [ogres.app.component.panel-player-sheets :as player-sheets] ; <<< ADDED THIS REQUIRE
+>>>>>>> Stashed changes
             [ogres.app.hooks :as hooks]
             [uix.core :refer [defui $]]))
 
@@ -30,6 +35,7 @@
       ($ :button.button {:disabled true} status-icon "Status not known"))))
 
 (def ^:private panel-data
+<<<<<<< Updated upstream
   {:data       {:icon "wrench-adjustable-circle" :label "Manage local data"}
    :initiative {:icon "hourglass-split" :label "Initiative"}
    :lobby      {:icon "people-fill" :label "Online options"}
@@ -46,10 +52,34 @@
    :lobby      {:form lobby/form :footer lobby/footer}
    :scene      {:form scene/form}
    :tokens     {:form tokens/form :footer tokens/footer}})
+=======
+  {:data          {:icon "wrench-adjustable-circle" :label "Manage local data"}
+   :initiative    {:icon "hourglass-split" :label "Initiative"}
+   :lobby         {:icon "people-fill" :label "Online options"}
+   :scene         {:icon "images" :label "Scene options"}
+   :tokens        {:icon "person-circle" :label "Tokens"}
+   :player-sheets {:icon "player-sheet" :label "Player Sheets"} ; <<< ADDED THIS ENTRY
+                   ;; Ensure you have an icon named "player-sheet" (i.e., id="icon-player-sheet")
+                   ;; in your icons.svg file. You could use "files" or "journal-bookmark-fill"
+                   ;; from your existing icons.svg if "player-sheet" isn't added yet.
+   })
+
+(def ^:private panel-forms
+  {:host [:tokens :scene :initiative :lobby :data :player-sheets] ; <<< ADDED :player-sheets
+   :conn [:tokens :initiative :lobby :player-sheets]})              ; <<< ADDED :player-sheets
+
+(def ^:private components
+  {:data          {:form data/form}
+   :initiative    {:form initiative/form :footer initiative/footer}
+   :lobby         {:form lobby/form :footer lobby/footer}
+   :scene         {:form scene/form}
+   :tokens        {:form tokens/form :footer tokens/footer}
+   :player-sheets {:form player-sheets/panel-root-component}}) ; <<< ADDED THIS ENTRY
+>>>>>>> Stashed changes
 
 (def ^:private query
   [[:user/type :default :conn]
-   [:panel/selected :default :tokens]
+   [:panel/selected :default :tokens] ; Default selected panel
    [:panel/expanded :default true]])
 
 (defui container []
@@ -58,7 +88,7 @@
         {type :user/type
          selected :panel/selected
          expanded :panel/expanded} result
-        forms (panel-forms type)]
+        forms (get panel-forms type [])] ; Added get with default empty vector for safety
     ($ :.panel
       {:data-expanded expanded}
       (if expanded
@@ -68,18 +98,21 @@
         {:role "tablist"
          :aria-controls "form-panel"
          :aria-orientation "vertical"}
-        (for [[key data] (map (juxt identity panel-data) forms)
-              :let [selected (= selected key)]]
+        ;; Ensure `panel-data` is correctly accessed for the available `forms`
+        (for [key forms
+              :let [panel-info (get panel-data key)
+                    is-selected (= selected key)]
+              :when panel-info] ; Only render if panel-info exists
           ($ :li.panel-tabs-tab
-            {:key key :role "tab" :aria-selected (and expanded selected)}
-            ($ :label {:aria-label (:label data)}
+            {:key key :role "tab" :aria-selected (and expanded is-selected)}
+            ($ :label {:aria-label (:label panel-info)}
               ($ :input
                 {:type "radio"
                  :name "panel"
                  :value key
-                 :checked (and expanded selected)
+                 :checked (and expanded is-selected)
                  :on-change #(dispatch :user/select-panel key)})
-              ($ icon {:name (:icon data) :size 20}))))
+              ($ icon {:name (:icon panel-info) :size 20}))))
         ($ :li.panel-tabs-control
           {:role "tab" :on-click #(dispatch :user/toggle-panel)}
           ($ :button {:type "button" :aria-label "Collapse or expand"}
@@ -91,7 +124,12 @@
            :data-form (name selected)}
           ($ :.form-container
             ($ :.form-content
-              (if-let [component (get-in components [selected :form])]
-                ($ :.form-body ($ component)))
-              (if-let [component (get-in components [selected :footer])]
-                ($ :.form-footer ($ component))))))))))
+              (if-let [component-map (get components selected)]
+                ($ :<>
+                  (if-let [form-component (:form component-map)]
+                    ($ :.form-body ($ form-component)))
+                  (if-let [footer-component (:footer component-map)]
+                    ($ :.form-footer ($ footer-component)))))
+              ;; Added a fallback message if no component is found for a selected panel
+              (when (nil? (get components selected))
+                ($ :p "Selected panel content not found.")))))))))

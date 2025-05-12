@@ -1,10 +1,17 @@
+;; src/main/ogres/app/events.cljs
 (ns ogres.app.events
   (:require [datascript.core :as ds]
             [clojure.set :refer [union difference]]
             [clojure.string :refer [trim]]
+<<<<<<< Updated upstream
             [ogres.app.const :refer [grid-size half-size]]
             [ogres.app.geom :as geom]
             [ogres.app.vec :as vec :refer [Vec2]]))
+=======
+            [ogres.app.const :refer [grid-size half-size]] ; Added half-size from your original file
+            [ogres.app.geom :as geom]
+            [ogres.app.vec :as vec :refer [Vec2]])) ; Added Vec2 from your original file
+>>>>>>> Stashed changes
 
 (def ^:private suffix-max-xf
   (map (fn [[label tokens]] [label (apply max (map :initiative/suffix tokens))])))
@@ -84,7 +91,7 @@
 
 (defmulti event-tx-fn (fn [_ event] event))
 
-(defmethod event-tx-fn :default [] [])
+(defmethod event-tx-fn :default [_ _] []) ; Added default dispatch to return empty tx data
 
 ;; -- Local --
 (defmethod
@@ -96,8 +103,8 @@
 (defmethod
   ^{:doc "Toggle the expanded state of the panel."}
   event-tx-fn :user/toggle-panel
-  [data]
-  (let [user (ds/entity data [:db/ident :user])]
+  [db] ; Changed 'data' to 'db' to match convention in this file
+  (let [user (ds/entity db [:db/ident :user])]
     [{:db/ident :user :panel/expanded (not (get user :panel/expanded true))}]))
 
 (defmethod
@@ -134,8 +141,8 @@
 
 ;; -- Camera --
 (defn ^:private assoc-camera
-  [data & kvs]
-  (let [user (ds/entity data [:db/ident :user])]
+  [db & kvs] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])]
     [(apply assoc {:db/id (:db/id (:user/camera user))} kvs)]))
 
 (defmethod
@@ -147,16 +154,22 @@
 (defmethod
   ^{:doc "Removes the public label for the current camera."}
   event-tx-fn :camera/remove-label
-  [data]
-  (let [user (ds/entity data [:db/ident :user])]
+  [db] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])]
     [[:db/retract (:db/id (:user/camera user)) :camera/label]]))
 
 (defmethod
   ^{:doc "Translate the current camera by the offset given by dx and dy."}
   event-tx-fn :camera/translate
+<<<<<<< Updated upstream
   [data _ delta]
   (let [{{id :db/id point :camera/point scale :camera/scale} :user/camera}
         (ds/entity data [:db/ident :user])]
+=======
+  [db _ delta] ; Changed 'data' to 'db'
+  (let [{{id :db/id point :camera/point scale :camera/scale} :user/camera}
+        (ds/entity db [:db/ident :user])]
+>>>>>>> Stashed changes
     [{:db/id id :camera/point (vec/add (or point vec/zero) (vec/div delta (or scale 1)))}]))
 
 (defmethod
@@ -165,8 +178,8 @@
           will have, such as drawing a shape or determining the distance
           between two points."}
   event-tx-fn :camera/change-mode
-  [data _ mode]
-  (let [user (ds/entity data [:db/ident :user])]
+  [db _ mode] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])]
     (if (mode-allowed? mode (:user/type user))
       [{:db/id (:db/id (:user/camera user)) :camera/draw-mode mode}]
       [])))
@@ -178,11 +191,12 @@
           adjusting the camera point to ensure that the user feels as if
           they are zooming in or out from their cursor."}
   event-tx-fn :camera/zoom-change
-  ([data event & args]
-   (let [user (ds/entity data [:db/ident :user])]
+  ([db event & args] ; Changed 'data' to 'db'
+   (let [user (ds/entity db [:db/ident :user])]
      (case (count args)
        0 [[:db.fn/call event-tx-fn event 1]]
        1 (let [[scale] args
+<<<<<<< Updated upstream
                bounds (or (:user/bounds user) vec/zero-segment)]
            [[:db.fn/call event-tx-fn event scale (vec/midpoint bounds)]])
        (let [[next-scale point] args
@@ -194,12 +208,26 @@
                (vec/sub point)
                (vec/div next-scale)
                (vec/add camera))}])))))
+=======
+               bounds (or (:user/bounds user) vec/zero-segment)] ; Assuming :user/bounds is defined
+           [[:db.fn/call event-tx-fn event scale (vec/midpoint bounds)]])
+       (let [[next-scale point] args
+             {{id :db/id current-scale :camera/scale camera-point :camera/point} :user/camera} user]
+         [{:db/id id
+           :camera/scale next-scale
+           :camera/point
+           (-> (vec/mul point (/ next-scale (or current-scale 1)))
+               (vec/sub point)
+               (vec/div next-scale)
+               (vec/add (or camera-point vec/zero)))}]))))) ; Added (or camera-point vec/zero)
+>>>>>>> Stashed changes
 
 (defmethod
   ^{:doc "Changes the zoom value for the current camera by offsetting it from
           the given value `delta`. This is useful for zooming with a device
           that uses fine grained updates such as a mousewheel or a trackpad."}
   event-tx-fn :camera/zoom-delta
+<<<<<<< Updated upstream
   [data _ mx my delta trackpad?]
   (let [user (ds/entity data [:db/ident :user])
         bound (or (:user/bounds user) vec/zero-segment)
@@ -210,30 +238,42 @@
                   (js/Math.log) (+ delta) (js/Math.exp)
                   (to-precision 2) (constrain 0.15 4))]
     [[:db.fn/call event-tx-fn :camera/zoom-change scale point]]))
+=======
+  [db _ mx my delta trackpad?] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])
+        bound (or (:user/bounds user) vec/zero-segment) ; Assuming :user/bounds
+        scale-fn (linear -400 400 -0.50 0.50) ; Renamed 'scale' to 'scale-fn' to avoid conflict
+        delta-val (if trackpad? (scale-fn (* -1 8 delta)) (scale-fn (* -1 2 delta)))
+        point (vec/sub (Vec2. mx my) (.-a bound))
+        zoomz (-> (:camera/scale (:user/camera user)) (or 1)
+                  (js/Math.log) (+ delta-val) (js/Math.exp)
+                  (to-precision 2) (constrain 0.15 4))]
+    [[:db.fn/call event-tx-fn :camera/zoom-change zoomz point]]))
+>>>>>>> Stashed changes
 
 (defmethod
   ^{:doc "Increases the zoom value for the current camera to the next nearest
           zoom level. These fixed zoom levels are determined by an internal
           constant."}
   event-tx-fn :camera/zoom-in
-  [data]
-  (let [user   (ds/entity data [:db/ident :user])
+  [db] ; Changed 'data' to 'db'
+  (let [user   (ds/entity db [:db/ident :user])
         camera (:user/camera user)
         prev   (or (:camera/scale camera) 1)
-        next   (reduce (fn [n s] (if (> s prev) (reduced s) n)) prev zoom-scales)]
-    [[:db.fn/call event-tx-fn :camera/zoom-change next]]))
+        next-val   (reduce (fn [n s] (if (> s prev) (reduced s) n)) prev zoom-scales)] ; Renamed 'next'
+    [[:db.fn/call event-tx-fn :camera/zoom-change next-val]]))
 
 (defmethod
   ^{:doc "Decreases the zoom value for the current camera to the nearest
           previous zoom level. These fixed zoom levels are determined by an
           internal constant."}
   event-tx-fn :camera/zoom-out
-  [data]
-  (let [user   (ds/entity data [:db/ident :user])
+  [db] ; Changed 'data' to 'db'
+  (let [user   (ds/entity db [:db/ident :user])
         camera (:user/camera user)
         prev   (or (:camera/scale camera) 1)
-        next   (reduce (fn [n s] (if (< s prev) (reduced s) n)) prev (reverse zoom-scales))]
-    [[:db.fn/call event-tx-fn :camera/zoom-change next]]))
+        next-val   (reduce (fn [n s] (if (< s prev) (reduced s) n)) prev (reverse zoom-scales))] ; Renamed 'next'
+    [[:db.fn/call event-tx-fn :camera/zoom-change next-val]]))
 
 (defmethod
   ^{:doc "Resets the zoom value for the given camera to its default setting of
@@ -246,8 +286,9 @@
 (defmethod
   ^{:doc "Creates a new blank scene and corresponding camera for the local user
           then switches them to it."}
-  event-tx-fn :scenes/create
+  event-tx-fn :scenes/create ; This was modified in ogres.app's original to match the structure from initial-data
   []
+<<<<<<< Updated upstream
   [[:db/add -1 :db/ident :root]
    [:db/add -1 :root/scenes -2]
    [:db/add -2 :db/empty true]
@@ -257,6 +298,18 @@
    [:db/add -3 :user/cameras -4]
    [:db/add -4 :camera/scene -2]
    [:db/add -4 :camera/point vec/zero]])
+=======
+  [[:db/add -1 :db/ident :root] ; Assuming :root needs to be added if not present
+   [:db/add -1 :root/scenes -2]
+   [:db/add -2 :db/empty true]
+   ;; Assuming user already exists, link new camera for this new scene
+   {:db/id [:db/ident :user] ; Use lookup ref for user
+    :user/camera -4           ; New camera ID
+    :user/cameras [-4]}       ; Add new camera to user's cameras
+   {:db/id -4                 ; Define the new camera
+    :camera/scene -2          ; Link to the new scene
+    :camera/point vec/zero}])
+>>>>>>> Stashed changes
 
 (defmethod
   ^{:doc "Switches to the given scene by the given camera identifier."}
@@ -269,14 +322,15 @@
           removes all scene cameras for any connected users and switches them
           to whichever scene the host is now on."}
   event-tx-fn :scenes/remove
-  [data _ id]
-  (let [camera  (ds/entity data id)
-        user    (ds/entity data [:db/ident :user])
-        session (ds/entity data [:db/ident :session])]
+  [db _ id] ; Changed 'data' to 'db'
+  (let [camera  (ds/entity db id)
+        user    (ds/entity db [:db/ident :user])
+        session (ds/entity db [:db/ident :session])]
     (cond
       (= (count (:user/cameras user)) 1)
       (into [[:db/retractEntity (:db/id camera)]
              [:db/retractEntity (:db/id (:camera/scene camera))]
+<<<<<<< Updated upstream
              {:db/ident :root
               :root/scenes {:db/id -2 :db/empty true}
               :root/user
@@ -289,27 +343,45 @@
             (for [[idx conn] (sequence (indexed 3 2) (:session/conns session))]
               {:db/id (:db/id conn)
                :user/camera idx
+=======
+             {:db/ident :root ; Assuming :root needs :db/ident if it's a lookup ref target
+              :root/scenes {:db/id -2 :db/empty true}} ; Recreate structure as in :scenes/create
+             {:db/id [:db/ident :user]
+              :user/camera -1
+              :user/cameras [{:db/id -1 ; Correctly a vector of maps or refs
+                              :camera/scene -2
+                              :camera/point vec/zero}]}]
+            (for [[idx-val conn-entity] (sequence (indexed 3 2) (:session/conns session))]; Renamed idx to idx-val
+              {:db/id (:db/id conn-entity) ; Ensure conn-entity is the entity map
+               :user/camera idx-val
+>>>>>>> Stashed changes
                :user/cameras
-               {:db/id idx
+               {:db/id idx-val
                 :camera/scene -2
                 :camera/point vec/zero
                 :camera/scale 1}}))
       (= id (:db/id (:user/camera user)))
       (let [host-cam (first (filter (comp (complement #{id}) :db/id) (:user/cameras user)))
-            host-scn (:db/id (:camera/scene host-cam))]
+            host-scn-id (:db/id (:camera/scene host-cam))] ; Renamed host-scn to host-scn-id
         (into [[:db/retractEntity (:db/id camera)]
                [:db/retractEntity (:db/id (:camera/scene camera))]
-               {:db/ident :user :user/camera {:db/id (:db/id host-cam)}}]
-              (for [[tmp conn] (sequence (indexed) (:session/conns session))
-                    :let [cam (->> (:user/cameras conn)
-                                   (filter (comp #{host-scn} :db/id :camera/scene))
+               {:db/id [:db/ident :user] :user/camera {:db/id (:db/id host-cam)}}] ; Corrected :db/ident
+              (for [[tmp conn-entity] (sequence (indexed) (:session/conns session)) ; Renamed conn to conn-entity
+                    :let [cam (->> (:user/cameras conn-entity)
+                                   (filter (comp #{host-scn-id} :db/id :camera/scene))
                                    (first))
                           idx (or (:db/id cam) tmp)]]
-                {:db/id (:db/id conn)
+                {:db/id (:db/id conn-entity)
                  :user/camera idx
+<<<<<<< Updated upstream
                  :user/cameras
                  {:db/id idx
                   :camera/scene host-scn
+=======
+                 :user/cameras ; This should be a ref or a list of refs/component maps
+                 {:db/id idx ; This makes :user/cameras a single ref, ensure schema matches
+                  :camera/scene host-scn-id ; This should be [:db/id host-scn-id] or similar if scene is an entity
+>>>>>>> Stashed changes
                   :camera/scale 1}})))
       :else
       [[:db/retractEntity (:db/id camera)]
@@ -318,22 +390,16 @@
 ;; -- Scene Images --
 (defmethod event-tx-fn :scene-images/create-many
   [_ _ images]
-  (into [{:db/ident :root
+  (into [{:db/id [:db/ident :root] ; Use lookup ref for :root
           :root/scene-images
           (for [[{:keys [hash name size width height]} _] images]
-            {:image/hash hash
-             :image/name name
-             :image/size size
-             :image/width width
-             :image/height height})}] cat
+            {:image/hash hash :image/name name :image/size size
+             :image/width width :image/height height})}] cat
         (for [[image thumbnail] images]
           (if (= (:hash image) (:hash thumbnail))
             [{:image/hash (:hash image) :image/thumbnail [:image/hash (:hash image)]}]
-            [{:image/hash (:hash thumbnail)
-              :image/name (:name thumbnail)
-              :image/size (:size thumbnail)
-              :image/width (:width thumbnail)
-              :image/height (:height thumbnail)}
+            [{:image/hash (:hash thumbnail) :image/name (:name thumbnail)
+              :image/size (:size thumbnail) :image/width (:width thumbnail) :image/height (:height thumbnail)}
              {:image/hash (:hash image) :image/thumbnail [:image/hash (:hash thumbnail)]}]))))
 
 (defmethod
@@ -347,10 +413,10 @@
 
 ;; -- Scene --
 (defn ^:private assoc-scene
-  [data & kvs]
-  (let [user (ds/entity data [:db/ident :user])
-        scene (:db/id (:camera/scene (:user/camera user)))]
-    [(apply assoc {:db/id scene} kvs)]))
+  [db & kvs] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])
+        scene-id (:db/id (:camera/scene (:user/camera user)))] ; Renamed 'scene' to 'scene-id'
+    [(apply assoc {:db/id scene-id} kvs)]))
 
 (defmethod
   ^{:doc "Updates the image being used for the current scene by the given
@@ -368,6 +434,7 @@
 (defmethod
   ^{:doc "Applies both a grid origin and tile size to the current scene."}
   event-tx-fn :scene/apply-grid-options
+<<<<<<< Updated upstream
   [data _ origin size]
   (let [{{camera-id :db/id point :camera/point
           {scene-id :db/id prev-origin :scene/grid-origin}
@@ -378,26 +445,37 @@
       :camera/point (vec/sub (vec/add point (or prev-origin vec/zero)) origin)
       :camera/scene
       {:db/id scene-id
+=======
+  [db _ origin size] ; Changed 'data' to 'db'
+  (let [{{{camera-id :db/id point :camera/point} :user/camera} :user/camera ; Corrected destructuring
+         {scene-id :db/id prev-origin :scene/grid-origin} :camera/scene}
+        (ds/entity db [:db/ident :user])]
+    [{:db/id camera-id
+      :camera/draw-mode :select
+      :camera/point (vec/sub (vec/add point (or prev-origin vec/zero)) origin)
+      :camera/scene ; This should be a ref or value, not a map for :camera/scene attribute
+      {:db/id scene-id ; This is correct if :camera/scene is a ref to a scene entity
+>>>>>>> Stashed changes
        :scene/grid-size size
        :scene/grid-origin origin}}]))
 
 (defmethod
   ^{:doc "Resets the grid origin to (0, 0)."}
   event-tx-fn :scene/reset-grid-origin
-  [data]
-  (let [user (ds/entity data [:db/ident :user])
-        scene (:db/id (:camera/scene (:user/camera user)))]
+  [db] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])
+        scene-id (:db/id (:camera/scene (:user/camera user)))] ; Renamed 'scene'
     [[:db.fn/call assoc-camera :camera/draw-mode :select]
-     [:db/retract scene :scene/grid-origin]]))
+     [:db/retract scene-id :scene/grid-origin]]))
 
 (defmethod
   ^{:doc "Retracts the grid size for the current scene, allowing queries to
           revert to their defaults."}
   event-tx-fn :scene/retract-grid-size
-  [data]
-  (let [user (ds/entity data [:db/ident :user])
-        scene (:db/id (:camera/scene (:user/camera user)))]
-    [[:db/retract scene :scene/grid-size]]))
+  [db] ; Changed 'data' to 'db'
+  (let [user (ds/entity db [:db/ident :user])
+        scene-id (:db/id (:camera/scene (:user/camera user)))] ; Renamed 'scene'
+    [[:db/retract scene-id :scene/grid-size]]))
 
 (defmethod
   ^{:doc "Updates whether or not the grid is drawn onto the current scene."}
@@ -446,39 +524,61 @@
   ^{:doc "Translates the objects given by idxs by the given delta,
           possibly aligning them to the grid if the appropriate scene
           option is enabled."}
+<<<<<<< Updated upstream
   [data _ idxs delta]
   (let [result (ds/entity data [:db/ident :user])
         align? (-> result :user/camera :camera/scene :scene/grid-align)]
     (into [[:db/retract [:db/ident :user] :user/dragging]]
           (for [entity (ds/pull-many data translate-many-select idxs)
+=======
+  [db _ idxs delta] ; Changed 'data' to 'db'
+  (let [result (ds/entity db [:db/ident :user])
+        align? (-> result :user/camera :camera/scene :scene/grid-align)]
+    (into [[:db/retract [:db/ident :user] :user/dragging]] ; Use lookup ref
+          (for [entity (ds/pull-many db translate-many-select idxs)
+>>>>>>> Stashed changes
                 :let [{id :db/id point :object/point} entity]]
             (cond
               (and align? (= (:object/type entity) :token/token))
               (let [bounds (vec/rnd (vec/add (geom/object-bounding-rect entity) delta) grid-size)]
                 {:db/id id :object/point (vec/midpoint bounds)})
               (and align? (not= (:object/type entity) :note/note))
+<<<<<<< Updated upstream
               (let [round (geom/object-alignment entity)]
                 {:db/id id :object/point (vec/rnd (vec/add point delta) round)})
+=======
+              (let [round-fn (geom/object-alignment entity)] ; Renamed 'round'
+                {:db/id id :object/point (vec/rnd (vec/add point delta) round-fn)})
+>>>>>>> Stashed changes
               :else
               {:db/id id :object/point (vec/add point delta)})))))
 
 (defmethod event-tx-fn :objects/translate-selected
   ^{:doc "Translate the currently selected objects by the given delta."}
+<<<<<<< Updated upstream
   [data _ delta]
   (let [select [{:user/camera [{:camera/selected [:db/id :object/point]}]}]
         result (ds/pull data select [:db/ident :user])
         {{selected :camera/selected} :user/camera} result]
     [[:db.fn/call event-tx-fn :objects/translate-many (into #{} (map :db/id) selected) delta]]))
+=======
+  [db _ delta] ; Changed 'data' to 'db'
+  (let [select-pattern [{:user/camera [{:camera/selected [:db/id :object/point]}]}] ; Renamed 'select'
+        result (ds/pull db select-pattern [:db/ident :user])
+        {{selected-objs :camera/selected} :user/camera} result] ; Renamed 'selected'
+    [[:db.fn/call event-tx-fn :objects/translate-many (into #{} (map :db/id) selected-objs) delta]]))
+>>>>>>> Stashed changes
 
 (defmethod event-tx-fn :objects/select
   ^{:doc "Joins or removes the object given by id to the current selection,
           alternating behavior based on the boolean modify."}
-  [data _ id modify]
-  (let [object (ds/entity data id)
-        entity (ds/entity data [:db/ident :user])
-        {{camera :db/id selected :camera/selected} :user/camera} entity]
-    [[:db/retract [:db/ident :user] :user/dragging]
+  [db _ id modify] ; Changed 'data' to 'db'
+  (let [object (ds/entity db id)
+        entity (ds/entity db [:db/ident :user])
+        {{camera-id :db/id selected-objs :camera/selected} :user/camera} entity] ; Renamed 'camera', 'selected'
+    [[:db/retract [:db/ident :user] :user/dragging] ; Use lookup ref
      (if (not modify)
+<<<<<<< Updated upstream
        [:db/retract camera :camera/selected])
      (if (and modify (contains? selected object))
        [:db/retract camera :camera/selected id]
@@ -1076,3 +1176,6 @@
     [[:db/add id :note/label label]
      [:db/add id :note/description desc]
      [:db/retract (:db/id (:user/camera user)) :camera/selected id]]))
+=======
+       [:db/retract camera-id
+>>>>>>> Stashed changes
