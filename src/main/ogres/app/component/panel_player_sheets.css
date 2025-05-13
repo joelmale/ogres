@@ -2,230 +2,245 @@
 
 /* Container for the entire player sheets panel content (list or form) */
 .player-sheets-panel-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Allow it to take up available space in the form content area */
-  }
-  
-  /* --- List View Styles --- */
-  .player-sheets-list-view {
-    display: flex;
-    flex-direction: column;
-    padding: 8px;
-    gap: 12px;
-    overflow-y: auto; /* If the list gets long */
-    flex-grow: 1;
-  }
-  
-  .list-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-  
-  .list-header h2 {
-    margin: 0;
-    font-size: 16px; /* Or your standard panel title size */
-    color: var(--color-black-100); /* Example variable */
-  }
-  
-  .list-actions {
-    display: flex;
-    gap: 8px;
-  }
-  
-  .sheets-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .sheet-item {
-    padding: 10px 12px;
-    border: 1px solid var(--color-blues-700); /* Example variable */
-    border-radius: 3px;
-    cursor: pointer;
-    background-color: var(--color-blues-900); /* Example variable */
-    transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
-  
-    &:hover,
-    &:focus-visible {
-      background-color: var(--color-blues-800); /* Example variable for hover */
-      border-color: var(--color-prime-500); /* Example variable for hover/focus */
-      outline: none;
-    }
-  }
-  
-  .sheet-summary-info {
-    display: flex;
-    flex-direction: column; /* Stack name and class/level */
-    gap: 2px;
-  }
-  
-  .sheet-name {
-    font-weight: bold;
-    color: var(--color-black-100); /* Example */
-  }
-  
-  .sheet-class-level {
-    font-size: 0.9em;
-    color: var(--color-blues-100); /* Example for a lighter text */
-  }
-  
-  .empty-list-message {
-    padding: 16px;
-    text-align: center;
-    color: var(--color-blues-200); /* Example */
-    font-style: italic;
-  }
-  
-  
-  /* --- Form View Styles (for creating/editing a sheet) --- */
-  .form-player-sheets {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 8px;
-    overflow-y: auto; /* Allow scrolling if form is long */
-    height: 100%; /* Try to make form scrollable within panel */
-  }
-  
-  .form-player-sheets > header {
-    margin-bottom: 8px;
-  }
-  
-  .form-player-sheets > header h2 {
-    font-size: 16px;
-    color: var(--color-black-100); /* Example variable */
-    margin: 0;
-  }
-  
-  .form-player-sheets .fieldset {
-    /* Assuming global .fieldset styles exist for border, padding etc.
-       Add specific overrides if needed */
-    display: flex;
-    flex-direction: column;
-    gap: 12px; /* Spacing between form groups within a fieldset */
-  }
-  
-  .form-player-sheets .fieldset legend {
-    font-weight: bold;
-    font-size: 13px;
-    padding-bottom: 6px;
-    color: var(--color-black-100); /* Example */
-    margin-bottom: 6px;
-    border-bottom: 1px solid var(--color-blues-700); /* Example separator */
-    width: 100%;
-  }
-  
-  .form-player-sheets .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .form-player-sheets .form-group label {
-    font-size: 12px;
-    color: var(--color-black-100); /* Example variable */
-    /* text-transform: uppercase; */ /* Optional */
-  }
-  
-  /* Grid layout for character basics */
-  .character-basics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Responsive columns */
-    gap: 12px 16px; /* Row and column gap */
-  }
-  
-  /* Grid layout for attributes */
-  .attribute-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 10px 16px; /* Row and column gap */
-  }
-  
-  .attribute-item .form-group input[type="number"] {
-    max-width: 100%; /* Allow it to fill its grid cell if needed */
-  }
-  
-  /* Grid layout for combat stats */
-  .combat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 10px 16px;
-  }
-  
-  /* Styling for saving throws and skills lists */
-  .saving-throws-skills-grid .saving-throws-list,
-  .saving-throws-skills-grid .skills-list {
-    display: grid;
-    /* Adjust column count as needed, or make it responsive */
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-    gap: 8px 16px; /* Row and column gap */
-  }
-  
-  .saving-throw-item,
-  .skill-item {
-    display: flex;
-    align-items: center; /* Align checkbox with the bonus input */
-    gap: 8px;
-  }
-  
-  .saving-throw-item .checkbox,
-  .skill-item .checkbox {
-    flex-shrink: 0; /* Prevent checkbox label from shrinking */
-    /* You might want to adjust width or flex properties of checkbox-field itself */
-  }
-  
-  .saving-throw-item .form-group, /* Target the form-group wrapping the bonus input */
-  .skill-item .form-group {
-    flex-grow: 1;
-    max-width: 70px; /* Keep bonus inputs small */
-  }
-  
-  .saving-throw-item .form-group label, /* Hide label for bonus input if checkbox label is enough */
-  .skill-item .form-group label {
-    display: none; 
-  }
-  
-  
-  /* Action buttons at the bottom of the form */
-  .form-actions {
-    display: flex;
-    justify-content: flex-start;
-    gap: 10px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--color-blues-700); /* Example separator */
-  }
-  
-  /* Assuming global .button, .text.text-ghost, .checkbox styles are defined elsewhere.
-     Add base styles here if they are not, for example: */
-  
-  /*
-  .form-player-sheets .text.text-ghost {
-    background-color: var(--input-bg-color, #333); // Example
-    border: 1px solid var(--input-border-color, #555); // Example
-    color: var(--text-color-light, #f0f0f0); // Example
-    padding: 6px 8px;
-    border-radius: 3px;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  
-  .form-player-sheets textarea.text.text-ghost {
-    min-height: 60px;
-    resize: vertical;
-  }
-  
-  .form-player-sheets .checkbox input {
-    margin-right: 6px;
-  }
-  .form-player-sheets .checkbox .checkbox-label {
-    color: var(--text-color-light, #f0f0f0); // Example
-  }
-  */
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Allow it to take up available space in the form content area */
+}
+
+/* --- List View Styles --- */
+/* This is the main container for the list view (header, list, footer) */
+.player-sheets-list-view {
+display: flex;           /* Use flexbox */
+flex-direction: column;  /* Stack children vertically */
+height: 100%;            /* Fill the available height from parent */
+padding: 8px;            /* Keep overall padding */
+/* Remove gap and overflow from here, handle in content/footer */
+}
+
+/* Header styling */
+.list-header {
+display: flex;
+/* justify-content: space-between; */ /* No longer needed */
+align-items: center;
+margin-bottom: 8px;
+flex-shrink: 0;         /* Prevent header from shrinking */
+}
+
+.list-header h2 {
+margin: 0;
+font-size: 16px;
+color: var(--color-black-100);
+}
+
+/* Styling for the actual list of sheets */
+.sheets-list {
+list-style: none;
+padding: 0;              /* Remove default list padding */
+margin: 0;               /* Remove default list margin */
+display: flex;
+flex-direction: column;
+gap: 8px;
+flex-grow: 1;            /* Make the list area grow to fill space */
+overflow-y: auto;      /* Allow only the list itself to scroll */
+/* Add margin-bottom if needed to separate from footer visually */
+margin-bottom: 8px;
+}
+
+/* Styling for the empty list message */
+.empty-list-message {
+padding: 16px;
+text-align: center;
+color: var(--color-blues-200);
+font-style: italic;
+flex-grow: 1;            /* Make the message area grow to fill space */
+overflow-y: auto;      /* Allow scrolling (less likely needed here) */
+display: flex;           /* Optional: center vertically too */
+align-items: center;     /* Optional: center vertically */
+justify-content: center; /* Optional: center horizontally */
+margin-bottom: 8px;
+}
+
+/* Styling for individual sheet items in the list */
+.sheet-item {
+padding: 10px 12px;
+border: 1px solid var(--color-blues-700);
+border-radius: 3px;
+cursor: pointer;
+background-color: var(--color-blues-900);
+transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+
+&:hover,
+&:focus-visible {
+  background-color: var(--color-blues-800);
+  border-color: var(--color-prime-500);
+  outline: none;
+}
+}
+
+.sheet-summary-info {
+display: flex;
+flex-direction: column; /* Stack name and class/level */
+gap: 2px;
+}
+
+.sheet-name {
+font-weight: bold;
+color: var(--color-black-100);
+}
+
+.sheet-class-level {
+font-size: 0.9em;
+color: var(--color-blues-100);
+}
+
+
+/* --- Footer and Action Button Styles --- */
+
+/* Target the footer element directly under the list view */
+/* Relies on .form-footer class from panel.css for sticky positioning, background, border, padding */
+.player-sheets-list-view > .form-footer {
+flex-shrink: 0; /* Prevent footer from shrinking */
+/* Add any specific overrides for padding or background if needed */
+/* padding: 6px 8px; Ensure consistent padding with other footers */
+}
+
+/* Target the action button container *inside* the footer */
+.form-footer .list-actions {
+display: flex;           /* Make buttons side-by-side */
+gap: 8px;              /* Space between buttons */
+justify-content: flex-start; /* Align buttons to the start (left) */
+/* Uncomment below to align buttons to the end (right) */
+/* justify-content: flex-end; */
+}
+
+
+/* --- Form View Styles (for creating/editing a sheet) --- */
+/* These remain unchanged unless editing form needs adjustment */
+.form-player-sheets {
+display: flex;
+flex-direction: column;
+gap: 16px;
+padding: 8px;
+overflow-y: auto; /* Allow scrolling if form is long */
+height: 100%;
+}
+
+.form-player-sheets > header {
+margin-bottom: 8px;
+}
+
+.form-player-sheets > header h2 {
+font-size: 16px;
+color: var(--color-black-100);
+margin: 0;
+}
+
+.form-player-sheets .fieldset {
+display: flex;
+flex-direction: column;
+gap: 12px;
+}
+
+.form-player-sheets .fieldset legend {
+font-weight: bold;
+font-size: 13px;
+padding-bottom: 6px;
+color: var(--color-black-100);
+margin-bottom: 6px;
+border-bottom: 1px solid var(--color-blues-700);
+width: 100%;
+}
+
+.form-player-sheets .form-group {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+
+.form-player-sheets .form-group label {
+font-size: 12px;
+color: var(--color-black-100);
+}
+
+.character-basics-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+gap: 12px 16px;
+}
+
+.attribute-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+gap: 10px 16px;
+}
+
+.attribute-item .form-group input[type="number"] {
+max-width: 100%;
+}
+
+.combat-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+gap: 10px 16px;
+}
+
+.saving-throws-skills-grid .saving-throws-list,
+.saving-throws-skills-grid .skills-list {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+gap: 8px 16px;
+}
+
+.saving-throw-item,
+.skill-item {
+display: flex;
+align-items: center;
+gap: 8px;
+}
+
+.saving-throw-item .checkbox,
+.skill-item .checkbox {
+flex-shrink: 0;
+}
+
+.saving-throw-item .form-group,
+.skill-item .form-group {
+flex-grow: 1;
+max-width: 70px;
+}
+
+.saving-throw-item .form-group label,
+.skill-item .form-group label {
+display: none;
+}
+
+.form-actions {
+display: flex;
+justify-content: flex-start;
+gap: 10px;
+margin-top: 16px;
+padding-top: 12px;
+border-top: 1px solid var(--color-blues-700);
+}
+
+.form-player-sheets .text.text-ghost {
+background-color: var(--input-bg-color, #333); /* Example fallback */
+border: 1px solid var(--input-border-color, #555); /* Example fallback */
+color: var(--text-color-light, #f0f0f0); /* Example fallback */
+padding: 6px 8px;
+border-radius: 3px;
+width: 100%;
+box-sizing: border-box;
+}
+
+.form-player-sheets textarea.text.text-ghost {
+min-height: 60px;
+resize: vertical;
+}
+
+.form-player-sheets .checkbox input {
+margin-right: 6px;
+}
+.form-player-sheets .checkbox .checkbox-label {
+color: var(--text-color-light, #f0f0f0); /* Example fallback */
+}

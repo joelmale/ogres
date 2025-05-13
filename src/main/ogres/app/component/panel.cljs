@@ -35,7 +35,8 @@
    :initiative {:icon "hourglass-split" :label "Initiative"}
    :lobby      {:icon "people-fill" :label "Online options"}
    :scene      {:icon "images" :label "Scene options"}
-   :tokens     {:icon "person-circle" :label "Tokens"}})
+   :tokens     {:icon "person-circle" :label "Tokens"}
+   :player-sheets {:icon "char-sheet" :label "Player Sheets"}})
 
 (def ^:private panel-forms
   {:host [:tokens :scene :initiative :lobby :data :player-sheets] ; <<< ADDED :player-sheets

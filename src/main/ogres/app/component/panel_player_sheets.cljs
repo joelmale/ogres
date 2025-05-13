@@ -1,8 +1,8 @@
-;; src/main/ogres/app/component/panel_player_sheets.cljs
 (ns ogres.app.component.panel-player-sheets
   (:require [ogres.app.component :refer [icon]]
             [ogres.app.hooks :as hooks]
-            [uix.core :as uix :refer [defui $]]
+            [clojure.string :as str]
+            [uix.core :as uix :refer [defui $]]))
 
 ;; --- Helper: Form Field Components ---
 (defui form-field [{:keys [label id type value placeholder on-change extra-props]
@@ -116,7 +116,7 @@
         ($ :div.attribute-grid
           (for [attr attributes-list]
             ($ :div.attribute-item {:key (name attr)}
-              (form-field {:label (clojure.string/capitalize (name attr)) :id attr :type "number"
+              (form-field {:label (str/capitalize (name attr)) :id attr :type "number"
                            :value (get current-sheet-prop attr) :on-change (handle-change-factory attr :number)
                            :extra-props {:min 1 :max 30}})))))
 
@@ -141,7 +141,7 @@
         ($ :div.saving-throws-list
           (for [attr attributes-list]
             ($ :div.saving-throw-item {:key (str "st-" (name attr))}
-              (checkbox-field {:label (clojure.string/capitalize (name attr))
+              (checkbox-field {:label (str/capitalize (name attr))
                                :id (keyword (str "st-" (name attr) "-prof"))
                                :checked (get current-sheet-prop (keyword (str "st-" (name attr) "-prof")))
                                :on-change (handle-change-factory (keyword (str "st-" (name attr) "-prof")) :boolean)})
@@ -155,7 +155,7 @@
         ($ :div.skills-list
           (for [{skill-key :key skill-label :label skill-attr :attr} skills-list]
             ($ :div.skill-item {:key (name skill-key)}
-              (checkbox-field {:label (str skill-label " (" (subs (clojure.string/upper-case (name skill-attr)) 0 3) ")")
+              (checkbox-field {:label (str skill-label " (" (subs (str/upper-case (name skill-attr)) 0 3) ")")
                                :id (keyword (str (name skill-key) "-prof"))
                                :checked (get current-sheet-prop (keyword (str (name skill-key) "-prof")))
                                :on-change (handle-change-factory (keyword (str (name skill-key) "-prof")) :boolean)})
@@ -223,24 +223,35 @@
 
 ;; --- List View for Player Sheets ---
 (defui SheetListView [{:keys [sheets on-select-sheet on-create-new on-generate-ai-new]}]
+  ;; Main container for the list view
   ($ :div.player-sheets-list-view
+
+    ;; Header containing only the title
     ($ :header.list-header
-      ($ :h2 "Player Sheets")
-      ($ :div.list-actions
-        ($ :button.button.button-primary {:on-click on-create-new}
-          ($ icon {:name "plus"}) " Create New Sheet")
-        ($ :button.button.button-neutral {:on-click on-generate-ai-new :style {:margin-left "10px"}}
-          ($ icon {:name "gem"}) " Generate New with AI")))
+      ($ :h2 "Player Sheets"))
+
+    ;; Content Area: Either the list or the empty message
+    ;; The CSS will make this section grow and scroll
     (if (empty? sheets)
       ($ :p.empty-list-message "No player sheets. Create one or generate with AI!")
       ($ :ul.sheets-list
         (for [sheet sheets] ; Assuming sheets have :id, :character-name, :class-level
           ($ :li.sheet-item {:key (:id sheet) :tabIndex 0
                              :on-click #(on-select-sheet (:id sheet))
-                             :on-key-down (fn [e] (when (or (= (.-key e) "Enter") (= (.-key e) " ")) (.preventDefault e) (on-select-sheet (:id sheet))))}
+                             :on-key-down (fn [e] (when (or (= (.-key e) "Enter") (= (.-key e) " "))
+                                                    (.preventDefault e)
+                                                    (on-select-sheet (:id sheet))))}
             ($ :div.sheet-summary-info
               ($ :strong.sheet-name (:character-name sheet))
-              ($ :span.sheet-class-level (when (:class-level sheet) (str " - " (:class-level sheet)))))))))))
+              ($ :span.sheet-class-level (when (:class-level sheet) (str " - " (:class-level sheet)))))))))
+
+    ;; Footer section containing the action buttons
+    ($ :footer.form-footer ;; Use the standard footer class from panel.css
+      ($ :div.list-actions ;; Keep this div for button layout (flex, gap)
+        ($ :button.button.button-primary {:on-click on-create-new}
+          ($ icon {:name "plus"}) " Create New Sheet")
+        ($ :button.button.button-neutral {:on-click on-generate-ai-new} ;; Removed inline style
+          ($ icon {:name "gem"}) " Generate New with AI")))))
 
 ;; --- Main Panel Component (this is what panel.cljs will use) ---
 (defui panel-root-component []
