@@ -132,12 +132,9 @@
            grid-align :scene/grid-align}
           :camera/scene}
          :user/camera} result
-        current-align-fn (if grid-align align-fn align-identity) ; Renamed from 'align' to avoid conflict
-
-        ;; 'basis' is the screen-to-world transformation matrix
-        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale))
-        ;; 'invert' is the world-to-screen transformation matrix
-        invert (matrix/inverse basis)
+        current-align-fn (if grid-align align-fn align-identity) ; Renamed from 'align' to avoid conflict 
+        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale))  ;; 'basis' is the screen-to-world transformation matrix
+        invert (matrix/inverse basis)  ;; 'invert' is the world-to-screen transformation matrix
 
         transform-segment (fn [segment matrix]
                             (when segment
@@ -173,7 +170,7 @@
                 screen-anchor-pos (transform-point aligned-world-cursor invert)] ; invert is world-to-screen
             ($ anchor {:transform screen-anchor-pos})))))))
 
-(defui ^:private polygon ; Minimal changes to polygon, mainly reverting previous renames if any
+(defui ^:private polygon ; ensure these transformations were consistent and correct, especially with respect to the camera's zoom/scale
   [{:keys [on-create]}]
   (let [result (hooks/use-query query)
         {bounds :user/bounds ; Not directly used in polygon logic below, but part of query
@@ -315,7 +312,7 @@
   (let [dispatch (hooks/use-dispatch)
         result (hooks/use-query query)
         {bounds :user/bounds
-         {point :camera/point ; Renamed from 'shift' for clarity if it's camera world pos
+         {point :camera/point ; Renamed from 'shift' for clarity since it's camera world pos
           scale :camera/scale
           {prev-size :scene/grid-size prev-origin :scene/grid-origin} :camera/scene} :user/camera} result
         [origin set-origin] (uix/use-state nil) ; screen-space click point for grid placement
@@ -324,7 +321,7 @@
         basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale)) ; screen-to-world
         invert (matrix/inverse basis) ; world-to-screen
 
-        grid-display-origin-on-screen (.-a bounds) ; Assuming (.-a bounds) is a fixed screen reference, e.g. top-left of drawing area
+        grid-display-origin-on-screen (.-a bounds); Assuming (.-a bounds) is a fixed screen reference, e.g. top-left of drawing area
                                                   ; This interpretation needs to be correct for the transform.
                                                   ; Or perhaps it's a world coord to offset the whole grid system.
                                                   ; The original (vec/sub origin basis) was complex.
