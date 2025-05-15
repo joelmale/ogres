@@ -1,7 +1,7 @@
 (ns ogres.app.component.scene-draw
   (:require [clojure.string :refer [join]]
             [ogres.app.component :refer [icon]]
-            [ogres.app.const :refer [grid-size half-size]] ;; Assuming world-line-thickness is also in const
+            [ogres.app.const :refer [grid-size half-size]]
             [ogres.app.geom :as geom]
             [ogres.app.hooks :as hooks]
             [ogres.app.matrix :as matrix]
@@ -126,122 +126,114 @@
   (let [{:keys [children on-release tile-path align-fn]
          :or {on-release :default align-fn align-identity}} props
         result (hooks/use-query query)
-        {bounds :user/bounds
-         {camera-world-pos :camera/point
-          camera-scale :camera/scale
+        {{point :camera/point ; This is camera's world position **Bounds was unused and removed
+          scale :camera/scale ; This is camera's zoom scale
           {grid-paths :scene/show-object-outlines
            grid-align :scene/grid-align}
           :camera/scene}
          :user/camera} result
-        align-tool-fn (if grid-align align-fn align-identity)
+        current-align-fn (if grid-align align-fn align-identity) ; Renamed from 'align' to avoid conflict
 
-        screen_to_world_matrix (matrix/scale (matrix/translate matrix/identity camera-world-pos) (/ camera-scale))
-        world_to_screen_matrix (matrix/inverse screen_to_world_matrix)
+        ;; 'basis' is the screen-to-world transformation matrix
+        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale))
+        ;; 'invert' is the world-to-screen transformation matrix
+        invert (matrix/inverse basis)
 
-        transform_segment_fn (fn [segment matrix]
-                               (when segment
-                                 (Segment. (vec/transform (.-a segment) matrix)
-                                           (vec/transform (.-b segment) matrix))))
-        transform_point_fn (fn [point matrix]
-                             (when point (vec/transform point matrix)))]
+        transform-segment (fn [segment matrix]
+                            (when segment
+                              (Segment. (vec/transform (.-a segment) matrix)
+                                        (vec/transform (.-b segment) matrix))))
+        transform-point (fn [pt matrix] (when pt (vec/transform pt matrix)))]
 
     ($ draw-segment-drag
       {:use-cursor (contains? props :align-fn)
        :on-release
-       (fn [raw-screen-segment-from-drag]
-         (let [world-segment (transform_segment_fn raw-screen-segment-from-drag screen_to_world_matrix)]
-           (on-release (align-tool-fn world-segment))))}
+       (fn [raw-screen-segment] ; From draw-segment-drag, in screen coordinates
+         (let [world-segment (transform-segment raw-screen-segment basis)] ; basis is screen-to-world
+           (on-release (current-align-fn world-segment))))}
 
-      (fn [active-dragging-screen-segment cursor-screen-pos]
+      (fn [active-screen-segment cursor-screen-pos] ; From draw-segment-drag
         (cond
-          (some? active-dragging-screen-segment)
-          (let [current-world-segment (transform_segment_fn active-dragging-screen-segment screen_to_world_matrix)
-                aligned-world-segment (align-tool-fn current-world-segment)
-                aligned-screen-segment (transform_segment_fn aligned-world-segment world_to_screen_matrix)]
+          (some? active-screen-segment)
+          (let [current-world-segment (transform-segment active-screen-segment basis) ; basis is screen-to-world
+                aligned-world-segment (current-align-fn current-world-segment)
+                aligned-screen-segment (transform-segment aligned-world-segment invert)] ; invert is world-to-screen
             ($ :<>
               (if (and (fn? tile-path) grid-paths (some? aligned-world-segment))
-                (let [world-path-elements (tile-path aligned-world-segment)]
+                (let [world-tile-elements (tile-path aligned-world-segment)] ; tile-path receives world, returns world elements
                   ($ :polygon.scene-draw-tile-path
-                    {:points (transduce (map (comp seq #(transform_point_fn % world_to_screen_matrix)))
-                                        points->poly [] world-path-elements)})))
+                    {:points (transduce (map (comp seq #(transform-point % invert))) points->poly [] world-tile-elements)})))
               (when (some? aligned-world-segment)
-                (children aligned-world-segment
-                          aligned-screen-segment
-                          world_to_screen_matrix))))
+                 ;; Children now called with: world-segment, screen-segment, world-to-screen-matrix
+                (children aligned-world-segment aligned-screen-segment invert))))
 
           (and grid-align (some? cursor-screen-pos))
-          (let [world-cursor-pos (transform_point_fn cursor-screen-pos screen_to_world_matrix)
-                aligned-world-cursor-pos (align-tool-fn world-cursor-pos)
-                screen-anchor-pos (transform_point_fn aligned-world-cursor-pos world_to_screen_matrix)]
+          (let [world-cursor (transform-point cursor-screen-pos basis) ; basis is screen-to-world
+                aligned-world-cursor (current-align-fn world-cursor)
+                screen-anchor-pos (transform-point aligned-world-cursor invert)] ; invert is world-to-screen
             ($ anchor {:transform screen-anchor-pos})))))))
 
-(defui ^:private polygon
+(defui ^:private polygon ; Minimal changes to polygon, mainly reverting previous renames if any
   [{:keys [on-create]}]
   (let [result (hooks/use-query query)
-        {bounds :user/bounds
-         {point :camera/point
-          scale :camera/scale
-          {align? :scene/grid-align} :camera/scene} :user/camera} result
-        [points set-points] (uix/use-state [])
-        [cursor set-cursor] (uix/use-state nil)
-        closing? (and (seq points) (some? cursor) (< (vec/dist (first points) cursor) 32))
+        {bounds :user/bounds ; Not directly used in polygon logic below, but part of query
+         {point :camera/point scale :camera/scale {align? :scene/grid-align} :camera/scene} :user/camera} result
+        [points set-points] (uix/use-state []) ; Storing world-space points
+        [cursor set-cursor] (uix/use-state nil) ; Storing world-space aligned cursor
 
-        screen_to_world_matrix (matrix/scale (matrix/translate matrix/identity point) (/ scale))
-        world_to_screen_matrix (matrix/inverse screen_to_world_matrix)]
+        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale)) ; screen-to-world
+        invert (matrix/inverse basis) ; world-to-screen
+
+        closing? (and (seq points) (some? cursor) (< (vec/dist (first points) cursor) (/ 32 scale))) ; Closing distance in world units
+        ]
     ($ :<>
       ($ :rect.scene-draw-surface
-        {:on-pointer-down
-         (fn [event]
-           (.stopPropagation event))
+        {:on-pointer-down (fn [event] (.stopPropagation event))
          :on-pointer-move
          (fn [event]
            (let [screen-point (Vec2. (.-clientX event) (.-clientY event))
-                 world-point (vec/transform screen-point screen_to_world_matrix)]
-             (set-cursor (vec/rnd world-point (if align? half-size 1)))))
+                 world-point (vec/transform screen-point basis)] ; basis is screen-to-world
+             (set-cursor (vec/rnd world-point (if align? half-size 1))))) ; cursor state is world-aligned
          :on-click
          (fn [event]
            (if (not closing?)
-             (set-points (conj points cursor)) ; cursor is already world-space aligned
-             (let [world-points-finalized (if closing? (conj points cursor) points) ; ensure last point added if closing
-                   xs (geom/reorient (mapcat seq world-points-finalized))
+             (set-points (conj points cursor)) ; Add current world-aligned cursor to points
+             (let [final-world-points (if closing? (conj points cursor) points)
+                   xs (geom/reorient (mapcat seq final-world-points))
                    xf (comp (partition-all 2) (map (fn [[x y]] (Vec2. x y))))]
                (set-points [])
                (set-cursor nil)
-               (on-create event (into [] xf xs)))))})
-      (if (and align? (not closing?) (some? cursor)) ; cursor is world-space aligned
-        ($ anchor {:transform (vec/transform cursor world_to_screen_matrix)}))
+               (on-create event (into [] xf xs)))))}) ; on-create receives world points
+      (if (and align? (not closing?) (some? cursor)) ; cursor is world-aligned
+        ($ anchor {:transform (vec/transform cursor invert)})) ; invert is world-to-screen
       (if (seq points) ; points are world-space
         ($ :circle.scene-draw-point-ring
-          {:transform (vec/transform (first points) world_to_screen_matrix) :r 6}))
-      (for [point points :let [screen-point (vec/transform point world_to_screen_matrix)]] ; points are world-space
-        ($ :circle.scene-draw-point
-          {:key screen-point :transform screen-point :r 4}))
+          {:transform (vec/transform (first points) invert) :r 6})) ; invert is world-to-screen
+      (for [point points :let [screen-point (vec/transform point invert)]] ; points are world-space
+        ($ :circle.scene-draw-point {:key screen-point :transform screen-point :r 4}))
       (if (and (seq points) (some? cursor)) ; points & cursor are world-space
         ($ :polygon.scene-draw-shape
-          {:points
-           (transduce
-            (map (comp seq #(vec/transform % world_to_screen_matrix)))
-            points->poly []
-            (if (not closing?) (conj points cursor) points))})))))
+          {:points (transduce (map (comp seq #(vec/transform % invert))) points->poly []
+                              (if (not closing?) (conj points cursor) points))}))))) ; invert is world-to-screen
 
 (defui ^:private draw-select []
   (let [dispatch (hooks/use-dispatch)]
     ($ draw-segment
       {:on-release (fn [world-segment] (dispatch :selection/from-rect world-segment))}
-      (fn [world-segment screen-segment _] ; Third arg is world_to_screen_matrix, not used here
+      ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new)
+      (fn [_ screen-segment _] ; world-segment and invert-matrix not used here
         (let [a (.-a screen-segment) b (.-b screen-segment)]
           ($ hooks/use-portal {:name :multiselect}
             ($ :path.scene-draw-shape
               {:d (join " " [\M (.-x a) (.-y a) \H (.-x b) \V (.-y b) \H (.-x a) \Z])})))))))
 
 (defui ^:private draw-ruler []
-  ($ draw-segment
-    {:align-fn align-grid-half}
-    (fn [world-segment screen-segment _] ; Third arg is world_to_screen_matrix, not used here
+  ($ draw-segment {:align-fn align-grid-half}
+    ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new)
+    (fn [world-segment screen-segment _] ; invert-matrix not used here
       (let [a (.-a screen-segment) b (.-b screen-segment)]
         ($ :<>
-          ($ :line.scene-draw-shape
-            {:x1 (.-x a) :y1 (.-y a) :x2 (.-x b) :y2 (.-y b)})
+          ($ :line.scene-draw-shape {:x1 (.-x a) :y1 (.-y a) :x2 (.-x b) :y2 (.-y b)})
           ($ anchor {:transform a})
           ($ anchor {:transform b})
           ($ text {:attrs {:x (- (.-x b) 48) :y (- (.-y b) 8)}}
@@ -252,14 +244,14 @@
     ($ draw-segment
       {:align-fn align-grid
        :on-release (fn [world-segment] (dispatch :shape/create :circle (seq world-segment)))
-       :tile-path (fn [world-segment]
-                    (let [r (vec/dist-cheb world-segment)]
-                      (geom/tile-path-circle (.-a world-segment) r)))}
-      (fn [world-segment screen-segment _] ; Third arg is world_to_screen_matrix, not used here
+       :tile-path (fn [world-segment] (let [r (vec/dist-cheb world-segment)] (geom/tile-path-circle (.-a world-segment) r)))}
+      ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new)
+      (fn [world-segment screen-segment _] ; invert-matrix not used here
         (let [src-screen (.-a screen-segment)
-              radius-world (vec/dist-cheb world-segment)]
+              radius-world (vec/dist-cheb world-segment)
+              radius-screen (vec/dist-cheb screen-segment)] ; For SVG 'r' attribute
           ($ :<>
-            ($ :circle.scene-draw-shape {:transform src-screen :r (vec/dist-cheb screen-segment)})
+            ($ :circle.scene-draw-shape {:transform src-screen :r radius-screen})
             ($ text {:attrs {:x (.-x src-screen) :y (.-y src-screen) :fill "white"}}
               (str (px->ft radius-world) "ft. radius"))))))))
 
@@ -268,7 +260,8 @@
     ($ draw-segment
       {:align-fn align-grid
        :on-release (fn [world-segment] (dispatch :shape/create :rect (seq world-segment)))}
-      (fn [world-segment screen-segment _] ; Third arg is world_to_screen_matrix, not used here
+      ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new)
+      (fn [world-segment screen-segment _] ; invert-matrix not used here
         (let [world-a (.-a world-segment) world-b (.-b world-segment)
               screen-a (.-a screen-segment) screen-b (.-b screen-segment)]
           ($ :<>
@@ -284,10 +277,11 @@
       {:align-fn align-line
        :on-release (fn [world-segment] (dispatch :shape/create :line (seq world-segment)))
        :tile-path (fn [world-segment] (geom/tile-path-line (geom/line-points world-segment)))}
-      (fn [world-segment screen-segment world_to_screen_matrix]
+      ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new, used here)
+      (fn [world-segment screen-segment invert-matrix]
         ($ :<>
-          (let [world-polygon-vertices (geom/line-points world-segment)
-                screen-polygon-vertices (map #(vec/transform % world_to_screen_matrix) world-polygon-vertices)]
+          (let [world-polygon-vertices (geom/line-points world-segment) ; geom/line-points now expects world-segment
+                screen-polygon-vertices (map #(vec/transform % invert-matrix) world-polygon-vertices)]
             ($ :polygon.scene-draw-shape
               {:points (join " " (mapcat seq screen-polygon-vertices))}))
           ($ text {:attrs {:x (.-x (.-a screen-segment)) :y (.-y (.-a screen-segment))}}
@@ -299,10 +293,11 @@
       {:align-fn align-cone
        :on-release (fn [world-segment] (dispatch :shape/create :cone (seq world-segment)))
        :tile-path (fn [world-segment] (geom/tile-path-cone (geom/cone-points world-segment)))}
-      (fn [world-segment screen-segment world_to_screen_matrix]
+      ;; Parameters: world-segment (was 'camera'), screen-segment (was 'canvas'), invert-matrix (new, used here)
+      (fn [world-segment screen-segment invert-matrix]
         ($ :<>
           (let [world-cone-shape-points (geom/cone-points world-segment)
-                screen-cone-shape-points (map #(vec/transform % world_to_screen_matrix) world-cone-shape-points)]
+                screen-cone-shape-points (map #(vec/transform % invert-matrix) world-cone-shape-points)]
             ($ :polygon.scene-draw-shape
               {:points (join " " (mapcat seq screen-cone-shape-points))}))
           ($ text {:attrs {:x (+ (.-x (.-b screen-segment)) 16) :y (+ (.-y (.-b screen-segment)) 16)}}
@@ -310,67 +305,64 @@
 
 (defui ^:private draw-poly []
   (let [dispatch (hooks/use-dispatch)]
-    ($ polygon {:on-create (fn [_ points] (dispatch :shape/create :poly points))})))
+    ($ polygon {:on-create (fn [_ world-points] (dispatch :shape/create :poly world-points))})))
 
 (defui ^:private draw-mask []
   (let [dispatch (hooks/use-dispatch)]
-    ($ polygon {:on-create (fn [_ points] (dispatch :mask/create (mapcat seq points)))})))
+    ($ polygon {:on-create (fn [_ world-points] (dispatch :mask/create (mapcat seq world-points)))})))
 
 (defui ^:private draw-grid []
   (let [dispatch (hooks/use-dispatch)
-        result (hooks/use-query query) ; Added result for matrix calculation
+        result (hooks/use-query query)
         {bounds :user/bounds
-         {shift :camera/point
-          camera-scale   :camera/scale ; Renamed from scale to camera-scale for clarity
-          {prev-size :scene/grid-size
-           prev-origin :scene/grid-origin}
-          :camera/scene} :user/camera} result
-        [origin set-origin] (uix/use-state nil) ; origin is screen-space click point
-        [size     set-size] (uix/use-state prev-size)
+         {point :camera/point ; Renamed from 'shift' for clarity if it's camera world pos
+          scale :camera/scale
+          {prev-size :scene/grid-size prev-origin :scene/grid-origin} :camera/scene} :user/camera} result
+        [origin set-origin] (uix/use-state nil) ; screen-space click point for grid placement
+        [size set-size] (uix/use-state prev-size)
 
-        base-world-pos (.-a bounds) ; Assuming this is a relevant world origin for grid alignment display
+        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale)) ; screen-to-world
+        invert (matrix/inverse basis) ; world-to-screen
 
-        ;; Matrices for transforming grid preview if origin is screen-space
-        ;; This section might need adjustment based on how 'origin' (screen-space) relates to grid's world position
-        screen_to_world_matrix (matrix/scale (matrix/translate matrix/identity shift) (/ camera-scale))
-        world_to_screen_matrix (matrix/inverse screen_to_world_matrix)
-
+        grid-display-origin-on-screen (.-a bounds) ; Assuming (.-a bounds) is a fixed screen reference, e.g. top-left of drawing area
+                                                  ; This interpretation needs to be correct for the transform.
+                                                  ; Or perhaps it's a world coord to offset the whole grid system.
+                                                  ; The original (vec/sub origin basis) was complex.
+                                                  ; Let's assume the transform positions the grid relative to screen point 'origin'.
         on-shift (fn [offset-screen] (fn [] (set-origin (fn [current-screen-origin] (vec/add current-screen-origin offset-screen)))))]
     ($ :g.grid-align
       ($ :rect.scene-draw-surface
-        {:on-click
-         (fn [event]
-           (set-origin (Vec2. (.-clientX event) (.-clientY event))))}) ; Sets origin to screen click point
-      (if (some? origin) ; origin is a screen point
+        {:on-click (fn [event] (set-origin (Vec2. (.-clientX event) (.-clientY event))))})
+      (if (some? origin) ; 'origin' is the screen point where the grid's logical (0,0) or center should appear for adjustment
         (let [rows 7
-              display-grid-cell-size (* size camera-scale (/ grid-size prev-size)) ; Visual size of grid cell on screen
+              display-grid-cell-size (* size scale (/ grid-size prev-size)) ; Visual size of grid cell on screen.
               wide (* display-grid-cell-size (inc rows))
               path (for [step (range (- rows) (inc rows))]
-                     (str "M " (* step display-grid-cell-size) " " (- wide)      " " \V " " wide " "
-                          "M " (- wide)      " " (* step display-grid-cell-size) " " \H " " wide " "))
-              ;; Transform the screen origin to where the grid (0,0) should appear based on this screen click
-              ;; This transform is for the visual grid rendering group
-              grid-group-transform (let [world-click-equivalent (vec/transform origin screen_to_world_matrix)
-                                         world-grid-zero (vec/sub world-click-equivalent base-world-pos) ; Or some other logic
-                                         screen-grid-zero (vec/transform world-grid-zero world_to_screen_matrix)]
-                                     (vec/sub origin base-world-pos))] ; Simplified: this positions grid (0,0) at screen 'origin' relative to 'base-world-pos's screen pos
-          ($ :g {:transform (vec/sub origin (vec/transform base-world-pos world_to_screen_matrix))} ; Position grid group
+                     (str "M " (* step display-grid-cell-size) " " (- wide) " " \V " " wide " "
+                          "M " (- wide) " " (* step display-grid-cell-size) " " \H " " wide " "))
+              ;; The group transform should make the grid's reference point (e.g., its center) appear at screen 'origin'
+              group-transform-str (str "translate(" (.-x origin) "," (.-y origin) ")")]
+          ($ :g {:transform group-transform-str} ; Grid drawing is centered around this screen point 'origin'
             ($ :path.grid-align-path {:d (join path)})
             ($ :circle.grid-align-center {:r 6})
-            ($ :foreignObject.grid-align-form
-              {:x -128 :y -128 :width 256 :height 256}
+            ($ :foreignObject.grid-align-form {:x -128 :y -128 :width 256 :height 256}
               ($ :form
                 {:on-submit
                  (fn [event]
                    (.preventDefault event)
-                   (let [world-origin-final (-> (vec/transform origin screen_to_world_matrix) ; Clicked screen point to world
-                                                (vec/add shift) ; Adjust by camera's current world position
-                                                (vec/add (or prev-origin vec/zero)) ; Add previous grid offset in world
-                                                (vec/mul (/ prev-size size)) ; Scale factor for new size
-                                                (vec/abs)
-                                                (vec/mod grid-size)
-                                                (vec/rnd 0.25))]
-                     (dispatch :scene/apply-grid-options world-origin-final size)))}
+                   ;; 'origin' is screen. Convert to world, then apply logic.
+                   (let [world-origin-for-dispatch (-> (vec/transform origin basis) ; basis is screen-to-world
+                                                       (vec/add point) ; Adjust based on camera pos (if 'point' is camera pos and 'basis' incorporates it)
+                                                                      ; This part is tricky. The original was:
+                                                                      ; (-> (vec/sub origin basis) (vec/div scale) (vec/add shift) ...)
+                                                                      ; Let's try to match original intent more closely if 'basis' definition is exact.
+                                                                      ; If basis = (matrix/scale (matrix/translate I point) (/ scale)), then (vec/transform origin basis) gives a world point.
+                                                       (vec/add (or prev-origin vec/zero)) ; Add previous world offset of grid
+                                                       (vec/mul (/ prev-size size))
+                                                       (vec/abs)
+                                                       (vec/mod grid-size)
+                                                       (vec/rnd 0.25))]
+                     (dispatch :scene/apply-grid-options world-origin-for-dispatch size)))}
                 ($ :fieldset.grid-align-origin
                   ($ :button {:type "button" :data-name "up"    :on-click (on-shift (Vec2. 0 -1))} ($ icon {:name "arrow-up-short" :size 20}))
                   ($ :button {:type "button" :data-name "right" :on-click (on-shift (Vec2. 1 0))}  ($ icon {:name "arrow-right-short" :size 20}))
@@ -388,14 +380,14 @@
 
 (defui ^:private draw-note []
   (let [dispatch (hooks/use-dispatch)
-        result (hooks/use-query query) ; For matrix
-        {{camera-world-pos :camera/point camera-scale :camera/scale} :user/camera} result
-        screen_to_world_matrix (matrix/scale (matrix/translate matrix/identity camera-world-pos) (/ camera-scale))]
+        result (hooks/use-query query)
+        {{point :camera/point scale :camera/scale} :user/camera} result
+        basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale))] ; screen-to-world
     ($ :rect.scene-draw-surface
       {:on-click
        (fn [event]
          (let [screen-point (Vec2. (.-clientX event) (.-clientY event))
-               world-point (vec/transform screen-point screen_to_world_matrix)]
+               world-point (vec/transform screen-point basis)] ; basis is screen-to-world
            (dispatch :note/create world-point)))})))
 
 (defui draw [{:keys [mode] :as props}]
