@@ -1,6 +1,6 @@
 (ns ogres.app.geom
   (:require [clojure.math :refer [floor ceil]]
-            [ogres.app.const :refer [grid-size half-size]]
+            [ogres.app.const :refer [grid-size half-size world-line-thickness]]
             [ogres.app.vec :as vec :refer [Vec2 Segment]]))
 
 (def ^:const deg45->rad (/ js/Math.PI 4))
@@ -26,27 +26,28 @@
        (clockwise-triangle? c a v)
        (clockwise-triangle? b c v)))
 
-(defn line-points [segment]
-  (let [ln half-size
-        av (.-a segment)
-        bv (.-b segment)
-        ax (.-x (.-a segment))
-        ay (.-y (.-a segment))
-        bx (.-x (.-b segment))
-        by (.-y (.-b segment))]
-    (if (= ay by)
-      [(vec/shift av 0 ln)
-       (vec/shift bv 0 ln)
-       (vec/shift bv 0 (- ay ln))
-       (vec/shift av 0 (- ay ln))]
-      (let [ma (/ (- bx ax) (- ay by))
-            mb (js/Math.sqrt (inc (* ma ma)))
-            si (js/Math.sign (- ay by))
-            dv (Vec2. (* ln si (/ mb)) (* ln si (/ ma mb)))]
-        [(vec/add av (vec/mul dv -1))
-         (vec/add bv (vec/mul dv -1))
-         (vec/add bv dv)
-         (vec/add av dv)]))))
+;; MODIFIED line-points function
+;; It now always uses world-line-thickness for a consistent world-space thickness.
+(defn line-points [segment] 
+  (let [a (.-a segment)
+        b (.-b segment)
+        v (vec/sub b a)
+        m (vec/dist v)] ; Magnitude of v (distance from origin)
+    (if (< m 0.0001) ; Special Case: Check for zero-length or very short segment and set to square 
+      (let [half-t (/ world-line-thickness 2)]
+        [(Vec2. (- (.-x a) half-t) (- (.-y a) half-t))
+         (Vec2. (+ (.-x a) half-t) (- (.-y a) half-t))
+         (Vec2. (+ (.-x a) half-t) (+ (.-y a) half-t))
+         (Vec2. (- (.-x a) half-t) (+ (.-y a) half-t))])
+      (let [n (vec/div v m) ; Normalized direction vector
+            p (Vec2. (- (.-y n)) (.-x n)) ; Perpendicular vector
+            ;; Offset vector based on world-line-thickness
+            world-offset-vec (vec/mul p (/ world-line-thickness 2))]
+        ;; These points are the vertices of the polygon in WORLD coordinates
+        [(vec/add a world-offset-vec) 
+         (vec/add b world-offset-vec)  
+         (vec/sub b world-offset-vec)  
+         (vec/sub a world-offset-vec)])))) 
 
 (defn cone-points [segment]
   (let [src (.-a segment)
