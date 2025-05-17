@@ -135,8 +135,8 @@
          :user/camera} result
         align (if grid-align align-fn align-identity)
         basis  (matrix/scale (matrix/translate matrix/identity point) (/ scale))
-        camera (matrix/translate basis (vec/mul (.-a bounds) -1))
-        invert (matrix/inverse basis)]
+        camera (matrix/translate basis (vec/mul (.-a bounds) -1)) ;; screen_raw -> world
+        invert (matrix/inverse basis)] ;; world -> screen_relative_to_focus
     ($ draw-segment-drag
       {:use-cursor (contains? props :align-fn)
        :on-release
@@ -144,13 +144,20 @@
          (on-release (align (camera segment))))}
       (fn [segment cursor]
         (cond (some? segment)
-              (let [segment (align (camera segment))]
+              (let [s_world (align (camera segment))] ;; s-world is the segment in world coordinates
+                ($ :<>
+                  ($ :line.scene-draw-shape
+                    {:x1 (.-x s_world)
+                     :y1 (.-y s_world)
+                     :x2 (.-x (.-b s_world))
+                     :y2 (.-y (.-b s_world))})
                 ($ :<>
                   (if (and (fn? tile-path) grid-paths)
-                    (let [path (tile-path segment)]
+                    (let [path (tile-path s_world)] ;; tile-path recieves the segment in world coordinates
                       ($ :polygon.scene-draw-tile-path
-                        {:points (transduce (map (comp seq invert)) points->poly [] path)})))
-                  (children segment (invert segment))))
+                        ;; tile-path result (path) is assumed world, transform with invert to screen
+                        {:points (transduce (map (comp seq #(vec/transform % invert))) points->poly [] path)})))
+                  (children s_world (invert s_world) invert))))
               (and grid-align (some? cursor))
               ($ anchor {:transform (invert (align (camera cursor)))}))))))
 
@@ -269,13 +276,14 @@
       {:align-fn align-line
        :on-release (fn [s] (dispatch :shape/create :line (seq s)))
        :tile-path
-       (fn [s]
-         (geom/tile-path-line (geom/line-points s)))}
-      (fn [camera canvas]
+       (fn [s_world] ;; s_world is world-segment
+         (geom/tile-path-line (geom/line-points s_world)))}
+      (fn [camera canvas invert-matrix] ;; 'camera' is world-segment, 'canvas' is its screen representation, invert_matrix is new argument
         ($ :<>
-          (let [points (geom/line-points canvas)]
+          (let [world-poly-vertices (geom/line-points camera)
+                screen-poly-vertices (map #(vec/transform % invert-matrix) world-poly-vertices)]
             ($ :polygon.scene-draw-shape
-              {:points (join " " (mapcat seq points))}))
+              {:points (join " " (mapcat seq screen-poly-vertices))}))
           ($ text
             {:attrs
              {:x (.-x (.-a canvas))
