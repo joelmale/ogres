@@ -142,15 +142,18 @@
        :on-release
        (fn [segment]
          (on-release (align (camera segment))))}
-      (fn [segment cursor]
-        (cond (some? segment)
-              (let [s_world (align (camera segment))] ;; s-world is the segment in world coordinates
+      (fn [segment cursor] ; segment & cursor are raw_screen from draw-segment-drag
+        (cond (some? segment) ; segment is raw_screen_drag_segment
+              (let [s_world (align (camera segment))] ;; s_world is the segment in world coordinates
                 ($ :<>
-                  ($ :line.scene-draw-shape
-                    {:x1 (.-x s_world)
-                     :y1 (.-y s_world)
-                     :x2 (.-x (.-b s_world))
-                     :y2 (.-y (.-b s_world))})
+                  (let [s_world_start_screen (vec/transform (.-a s_world) invert)
+                        s_world_end_screen (vec/transform (.-b s_world) invert)]
+                    ($ :line ;; Assuming you want a temporary debug line, maybe style it differently
+                      {:stroke "yellow" :stroke-dasharray "2,2" ; Example debug style
+                       :x1 (.-x s_world_start_screen)
+                       :y1 (.-y s_world_start_screen)
+                       :x2 (.-x s_world_end_screen)
+                       :y2 (.-y s_world_end_screen)}))
                 ($ :<>
                   (if (and (fn? tile-path) grid-paths)
                     (let [path (tile-path s_world)] ;; tile-path recieves the segment in world coordinates
