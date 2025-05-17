@@ -1,6 +1,7 @@
 (ns ogres.app.geom
   (:require [clojure.math :refer [floor ceil]]
             [ogres.app.const :refer [grid-size half-size world-line-thickness]]
+            [ogres.app.const :refer [grid-size half-size world-line-thickness]]
             [ogres.app.vec :as vec :refer [Vec2 Segment]]))
 
 (def ^:const deg45->rad (/ js/Math.PI 4))
