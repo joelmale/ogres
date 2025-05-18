@@ -5,6 +5,7 @@
             [ogres.app.component.panel-lobby :as lobby]
             [ogres.app.component.panel-scene :as scene]
             [ogres.app.component.panel-tokens :as tokens]
+            [ogres.app.component.panel-dice-roller :as dice-roller]
             [ogres.app.hooks :as hooks]
             [uix.core :refer [defui $]]))
 
@@ -34,18 +35,21 @@
    :initiative {:icon "hourglass-split" :label "Initiative"}
    :lobby      {:icon "people-fill" :label "Online options"}
    :scene      {:icon "images" :label "Scene options"}
-   :tokens     {:icon "person-circle" :label "Tokens"}})
+   :tokens     {:icon "person-circle" :label "Tokens"}
+   :dice-roller{:icon "dice-cup" :label "Dice"}})
 
 (def ^:private panel-forms
-  {:host [:tokens :scene :initiative :lobby :data]
-   :conn [:tokens :initiative :lobby]})
+  {:host [:tokens :scene :initiative :dice-roller :lobby :data] 
+   :conn [:tokens :initiative :dice-roller :lobby]})
 
 (def ^:private components
   {:data       {:form data/form}
    :initiative {:form initiative/form :footer initiative/footer}
    :lobby      {:form lobby/form :footer lobby/footer}
    :scene      {:form scene/form}
-   :tokens     {:form tokens/form :footer tokens/footer}})
+   :tokens     {:form tokens/form :footer tokens/footer}
+   :dice-roller{:form dice-roller/panel-content}
+   })
 
 (def ^:private query
   [[:user/type :default :conn]
