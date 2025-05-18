@@ -5,9 +5,13 @@
             [uix.dom :as dom]))
 
 (defn ^:private create-range
-  "Returns a vector of page indexes or spacing sentinels suitable for use
-   in a pagination component. Sentinels include `:spacel` and `:spacer`.
-   The vector will contain anywhere between 1 and 7 elements.
+  "Generates a vector of page numbers and spacing sentinels for pagination.
+   Parameters:
+     - min: The first page number (integer).
+     - max: The last page number (integer).
+     - val: The currently selected page number (integer).
+   Returns a vector containing page numbers and/or sentinels (`:spacel`, `:spacer`).
+   The vector will have between 1 and 7 elements.
    ```
    (create-range 1 78 23) ;; [1 :spacel 22 23 24 :spacer 78]
    ```"
@@ -94,7 +98,83 @@
   (let [url (hooks/use-image hash)]
     (children url)))
 
-(defui fullscreen-dialog [props]
+(defui form-field ;; A reusable form field component
+  "Renders a form field with a label, input, and optional extra properties.
+   ```
+   ($ form-field
+     {:label 'Name'
+      :id 'name'
+      :type 'text'
+      :value 'John Doe'
+      :placeholder 'Enter your name'
+      :on-change (fn [e] (println (.-target.value e)))})
+   ```"
+  [{:keys [label id type value placeholder on-change extra-props]
+                    :or {type "text" extra-props {}}}]
+  ($ :div.form-group ; You'll need a CSS class for .form-group
+    (when label ($ :label {:htmlFor id} label))
+    ($ :input.text.text-ghost ; Assuming .text.text-ghost are existing global styles
+      (merge
+       {:id id
+        :name id
+        :type type
+        :value (if (nil? value) "" value) ; Ensure value is not nil for controlled input
+        :placeholder placeholder
+        :on-change on-change}
+       extra-props))))
+
+(defui textarea-field
+  "A reusable component for a label and a textarea
+   ```
+   ($ textarea-field
+     {:label 'Description'
+      :id 'description'
+      :value 'This is a description.'
+      :placeholder 'Enter description...'
+      :on-change (fn [e] (println (.-target.value e)))})
+   ```"
+  [{:keys [label id value placeholder on-change rows extra-props]
+    :or   {rows 3 extra-props {}}}]
+  ($ :div.form-group
+    (when label ($ :label {:htmlFor id} label))
+    ($ :textarea.text.text-ghost
+      (merge
+       {:id id
+        :name (name id)
+        :rows rows
+        :value (if (nil? value) "" value)
+        :placeholder placeholder
+        :on-change on-change}
+       extra-props))))
+
+(defui checkbox-field
+  "A reusable component for a label, an icon, and a checkbox.
+   ```
+   ($ checkbox-field {:id \"agree-terms\" :label \"I agree to the terms\"
+                      :checked @agreed? :on-change #(reset! agreed? (.-target.checked %))})
+   ```"
+  [{:keys [label id checked on-change extra-props]
+    :or {extra-props {}}}]
+  ($ :label.checkbox
+    ($ :input
+      (merge
+       {:type "checkbox"
+        :id id
+        :name (name id)
+        :checked (boolean checked) ; Ensure it's a boolean
+        :on-change on-change}
+       extra-props))
+    ($ icon {:name (if checked "check" "square") :size 16}) ; Uses your existing icon component
+    (when label ($ :span.checkbox-label " " label)))) ; Class for styling the text part of label
+
+(defui fullscreen-dialog
+  "Renders children in a fullscreen dialog, closable via Escape or backdrop click.
+   ```
+   ($ fullscreen-dialog {:on-close #(js/alert \"Dialog closing!\")}
+     ($ :div {:style {:padding \"20px\" :background \"white\"}}
+       ($ :h2 \"My Dialog Content\")))
+   ```"
+  [props]
   (let [element (.querySelector js/document "#root")
         dialog  (uix/use-ref nil)]
     (hooks/use-shortcut ["Escape"]

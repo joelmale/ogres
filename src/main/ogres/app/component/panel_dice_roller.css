@@ -1,210 +1,228 @@
-/* src/main/ogres/app/component/panel_player_sheets.css */
+/* Dice Roller Panel CSS - Updated to align with panel_scene.css styles */
 
-/* Main container for the entire player sheets panel (list view or form view) */
-.player-sheets-panel-container {
+.dice-roller-panel-content {
   display: flex;
   flex-direction: column;
-  height: 100%; /* Occupy available vertical space */
-  overflow: hidden; /* Prevent content from spilling out, parent will scroll if needed */
-}
-
-/* --- List View Styles --- */
-.player-sheets-list-view {
-  display: flex;
-  flex-direction: column;
+  gap: 12px; /* Spacing between main sections */
   padding: 8px;
-  gap: 12px;
-  overflow-y: auto; /* Enable scrolling for the list itself */
-  flex-grow: 1; /* Allow list to take available space */
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box; /* Added for good measure */
+  
 }
 
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 0 8px 0; /* Padding for the header area */
-  border-bottom: 1px dotted var(--color-black-500); /* Match initiative prompt border */
+.dice-roller-panel-content > header h2 {
+  color: var(--color-blues-700);
+  font-size: 20px;
+  font-weight: 500;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.dice-roller-panel-content .fieldset legend {
+  font-weight: 500;
+  font-size: 13px;
+  padding-bottom: 4px;
+  color: var(--color-blues-700); /* Changed from var(--color-blues-100) for better readability */
   margin-bottom: 8px;
-
-  h2 {
-    margin: 0;
-    font-size: 14px; /* Match .initiative header h3 */
-    color: var(--color-black-100); /* Example, adjust to your project */
-    line-height: 1.2; /* Adjust as needed */
-  }
+  border-bottom: 1px solid var(--color-blues-700);
+  width: 100%;
+  box-sizing: border-box; /* Added for good measure */
 }
 
-.list-actions {
+.dice-entry-list {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-/* Styling for the list of sheets */
-.sheets-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.die-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px; /* Spacing between sheet items */
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
 }
 
-.sheet-item {
-  padding: 10px 12px;
-  border: 1px solid var(--color-blues-700, #4A5568); /* Fallback color if var not defined */
+.die-row label {
+  font-size: 1.5em;
+  color: var(--color-blues-700);
+  flex-basis: 45px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.die-row > .icon { /* Style for the icon directly within the die-row */
+  margin-left: 4px;
+  flex-basis: 45px;
+  flex-shrink: 0;
+  fill: var(--color-blues-300);
+  align-items: center;
+  width: 22px; 
+  height: 22px; 
+}
+
+.die-row .quantity-input { /* Specific class for quantity inputs */
+  width: 60px;
+  padding: 6px 8px; /* Removed !important unless strictly necessary after testing */
+  text-align: center;
+  color: var(--color-blues-700);
+  background-color: var(--color-paper-300);
+  border: 1px solid var(--color-blues-700);
+  border-radius: 3px;
+  box-sizing: border-box;
+  /* Assumes .text .text-ghost styles are applied via CLJS or can be removed if not needed */
+}
+
+.modifier-fieldset {
+  margin-top: 10px;
+}
+
+.modifier-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.modifier-controls button { /* Relies on global .button .button-neutral or styles below */
+  width: 36px;
+  height: 32px;
+  font-size: 1.1em;
+  padding: 0;
+  display: flex;
+  align-items: center; 
+  justify-content: center;
+  min-height: 0;
+  background-color: var(--color-black-100);
+  color: var(--color-blues-700); 
+  border: none; /* Or 1px solid var(--color-blues-800) */
   border-radius: 3px;
   cursor: pointer;
-  background-color: var(--color-blues-900, #2D3748); /* Fallback color */
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-
-  &:hover,
-  &:focus-visible {
-    background-color: var(--color-blues-800, #38455A); /* Darker blue for hover */
-    border-color: var(--color-prime-500, #63B3ED); /* Accent color for hover/focus */
-    outline: none;
-  }
 }
 
-.sheet-summary-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.modifier-controls button:hover {
+  background-color: var(--color-blues-500);
 }
 
-.sheet-name {
-  font-weight: 500; /* Matches .initiative-token-label */
-  font-size: 15px; /* Slightly smaller than h2, adjust as needed */
-  color: var(--color-blues-100, #E2E8F0); /* Lighter text */
-  line-height: 1.2;
-}
-
-.sheet-class-level {
-  font-size: 12px; /* Matches .initiative-token-flags */
-  color: var(--color-blues-300, #A0AEC0); /* Subdued text color */
-  line-height: 1.3;
-}
-
-.empty-list-message {
-  padding: 16px;
+.modifier-value-display {
+  display: inline-block;
+  width: 60px;
   text-align: center;
-  color: var(--color-blues-200, #CBD5E0);
-  font-style: italic;
-  font-size: 14px;
-}
-
-
-/* --- Form View Styles (for creating/editing a sheet) --- */
-.form-player-sheets {
-  display: flex;
-  flex-direction: column;
-  gap: 12px; /* Spacing between fieldsets */
-  padding: 8px;
-  overflow-y: auto; /* Allow scrolling for the form content */
-  height: 100%;
-}
-
-.form-player-sheets > header {
-  padding-bottom: 8px;
-  border-bottom: 1px dotted var(--color-black-500);
-  margin-bottom: 8px;
-
-  h2 {
-    margin: 0;
-    font-size: 14px; /* Match .initiative header h3 */
-    color: var(--color-black-100);
-    line-height: 1.2;
-    text-align: center;
-  }
-}
-
-.form-player-sheets .fieldset {
-  display: flex;
-  flex-direction: column;
-  gap: 10px; /* Spacing between form groups within a fieldset */
-  /* Assuming global .fieldset provides border/padding. Add here if needed:
-  border: 1px dotted var(--color-black-500);
-  padding: 8px;
+  font-size: 1em;
+  padding: 6px 0;
+  color: var(--color-blues-700);
+  background-color: var(--color-paper-300);
+  border: 1px solid var(--color-blues-700);
   border-radius: 3px;
-  */
+  min-height: 32px; /* Match button height */
+  line-height: 1.5; /* Adjust for vertical centering */
+  box-sizing: border-box;
 }
 
-.form-player-sheets .fieldset legend {
-  font-weight: 500; /* Bolder than normal text */
+.form-actions { /* Used for the main Roll Dice button container */
+  margin-top: 15px;
+  margin-bottom: 10px;
+}
+
+.roll-all-button { /* Specific class for the main roll button */
+  width: 100%;
+  padding: 10px 15px; /* Removed !important unless strictly necessary */
+  font-size: 1.1em; /* Removed !important unless strictly necessary */
+  background-color: var(--color-prime-500);
+  color: var(--color-white); /* Assuming var(--color-white) is defined for white text */
+  border: none; /* Or 1px solid var(--color-prime-700) or similar */
+  border-radius: 3px;
+  cursor: pointer;
+  /* Should pick up .button .button-primary styles, these are explicit if needed */
+}
+
+.roll-all-button:hover {
+  background-color: var(--color-prime-400); /* Assuming a var for hover, or adjust brightness/saturation */
+}
+
+
+.results-area {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: var(--color-black-100);
+  border: 1px solid var(--color-blues-700);
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.results-area .roll-error {
+  color: var(--color-danger-500);
+  font-weight: bold;
+}
+
+.results-area p {
+  margin: 3px 0;
+  color: var(--color-black-100);
+}
+
+.results-area .roll-summary-string {
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--color-blues-800)
+}
+
+.results-area .roll-detail {
+  margin-left: 0px;
+  font-size: 0.95em;
+  color: var(--color-blues-800)
+}
+
+.results-area .roll-modifier {
+  margin-left: 10px;
+}
+
+.results-area .total-display {
+  font-weight: bold;
+  font-size: 1.2em;
+  color: var(--color-prime-500);
+  margin-top: 6px;
+}
+
+.history-area {
+  margin-top: 15px;
+}
+
+.history-area legend { /* Style should be consistent with .dice-roller-panel-content .fieldset legend */
+  font-weight: 500;
   font-size: 13px;
   padding-bottom: 4px;
-  color: var(--color-blues-100); /* Lighter color for legend */
-  margin-bottom: 6px;
+  color: var(--color-blues-700);
+  margin-bottom: 8px; /* Original had 5px !important, check if this is more consistent */
   border-bottom: 1px solid var(--color-blues-700);
   width: 100%;
+  box-sizing: border-box;
 }
 
-.form-player-sheets .form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px; /* Slightly tighter gap between label and input */
+.roll-history-list {
+  list-style: none;
+  padding: 8px;
+  margin: 0;
+  max-height: 100px;
+  overflow-y: auto;
+  font-size: 0.85em;
+  background-color: var(--color-paper-300); /* Kept as paper, can be var(--color-blues-950) for a light blue */
+  border: 1px solid var(--color-blues-800);
+  border-radius: 3px;
 }
 
-.form-player-sheets .form-group label {
-  font-size: 11px; /* Smaller label text */
-  color: var(--color-blues-200); /* Subdued label color */
-  /* text-transform: uppercase; */ /* Optional */
+.roll-history-list li {
+  padding: 3px 2px;
+  border-bottom: 1px solid var(--color-blues-800); /* Changed from dotted and adjusted color */
+  color: var(--color-black-800);
 }
 
-/* Grid layouts for sections */
-.character-basics-grid,
-.attribute-grid,
-.combat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px 12px; /* Row and column gap */
+.roll-history-list li:first-child {
+  font-weight: bold;
+  color: var(--color-blues-700);
 }
 
-.attribute-item .form-group input[type="number"] {
-  max-width: 100%; /* Let it fill grid cell, but can be constrained by parent grid cell width */
-}
-
-.saving-throws-skills-grid {
-  /* Can add specific styling if needed, otherwise relies on .fieldset */
-}
-
-.saving-throws-list,
-.skills-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* Adjust minmax for desired width */
-  gap: 6px 12px; /* Row and column gap */
-}
-
-.saving-throw-item,
-.skill-item {
-  display: grid; /* Use grid for better alignment of checkbox and bonus input */
-  grid-template-columns: auto 1fr; /* Checkbox takes its content width, input takes rest */
-  align-items: center;
-  gap: 6px;
-}
-
-.saving-throw-item .checkbox,
-.skill-item .checkbox {
-  /* Styles for the .checkbox label wrapper from checkbox-field component */
-  display: flex;
-  align-items: center;
-  white-space: nowrap; /* Prevent label from wrapping too early */
-}
-
-.saving-throw-item .form-group, /* Targets the form-group wrapping the bonus input */
-.skill-item .form-group {
-  max-width: 65px; /* Keep bonus inputs small */
-}
-
-.saving-throw-item .form-group label, /* Hide label for bonus input as checkbox label is sufficient */
-.skill-item .form-group label {
-  display: none; 
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-blues-700);
+.roll-history-list li:last-child {
+  border-bottom: none;
 }
