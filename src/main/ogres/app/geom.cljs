@@ -1,8 +1,9 @@
 (ns ogres.app.geom
   (:require [clojure.math :refer [floor ceil]]
-            [ogres.app.const :refer [grid-size half-size world-line-thickness]]
-            [ogres.app.const :refer [grid-size half-size world-line-thickness]]
-            [ogres.app.vec :as vec :refer [Vec2 Segment]]))
+            [ogres.app.const :refer [grid-size half-size]]
+            [ogres.app.matrix :as matrix]
+            [ogres.app.segment :as seg :refer [Segment]]
+            [ogres.app.vec :as vec :refer [Vec2]]))
 
 (def ^:const deg45->rad (/ js/Math.PI 4))
 (def ^:const deg45->sin (js/Math.sin deg45->rad))
@@ -27,27 +28,30 @@
        (clockwise-triangle? c a v)
        (clockwise-triangle? b c v)))
 
-(defn line-points [segment] ;; Segment is now expected to be in WORLD coordinates
-  (let [ln (/ world-line-thickness 2) 
-        av (.-a segment)
-        bv (.-b segment)
-        ax (.-x (.-a segment))
-        ay (.-y (.-a segment))
-        bx (.-x (.-b segment))
-        by (.-y (.-b segment))]
-    (if (= ay by)
-      [(Vec2. ax (+ ay ln)) ; Shifted up
-       (Vec2. bx (+ by ln)) ; Shifted up
-       (Vec2. bx (- by ln)) ; Shifted down
-       (Vec2. ax (- ay ln))] ; Shifted down
-      (let [ma (/ (- bx ax) (- ay by))
-            mb (js/Math.sqrt (inc (* ma ma)))
-            si (js/Math.sign (- ay by))
-            dv (Vec2. (* ln si (/ mb)) (* ln si (/ ma mb)))]
-        [(vec/add av (vec/mul dv -1))
-         (vec/add bv (vec/mul dv -1))
-         (vec/add bv dv)
-         (vec/add av dv)]))))
+(defn line-points
+  ([segment]
+   (line-points segment half-size))
+  ([segment width]
+   (let [ln width
+         av (.-a segment)
+         bv (.-b segment)
+         ax (.-x (.-a segment))
+         ay (.-y (.-a segment))
+         bx (.-x (.-b segment))
+         by (.-y (.-b segment))]
+     (if (= ay by)
+       [(vec/shift av 0 ln)
+        (vec/shift bv 0 ln)
+        (vec/shift bv 0 (- ay ln))
+        (vec/shift av 0 (- ay ln))]
+       (let [ma (/ (- bx ax) (- ay by))
+             mb (js/Math.sqrt (inc (* ma ma)))
+             si (js/Math.sign (- ay by))
+             dv (Vec2. (* ln si (/ mb)) (* ln si (/ ma mb)))]
+         [(vec/add av (vec/mul dv -1))
+          (vec/add bv (vec/mul dv -1))
+          (vec/add bv dv)
+          (vec/add av dv)])))))
 
 (defn cone-points [segment]
   (let [src (.-a segment)
@@ -67,6 +71,12 @@
    (vec/shift point grid-size)
    (vec/shift point 0 grid-size)])
 
+(defn rect-points [segment]
+  [(.-a segment)
+   (Vec2. (.-x (.-b segment)) (.-y (.-a segment)))
+   (Vec2. (.-x (.-a segment)) (.-y (.-b segment)))
+   (.-b segment)])
+
 (defn rect-intersects-rect [a b]
   (not (or (< (.-x (.-b a)) (.-x (.-a b)))
            (< (.-x (.-b b)) (.-x (.-a a)))
@@ -74,10 +84,10 @@
            (< (.-y (.-b b)) (.-y (.-a a))))))
 
 (defn bounding-rect-rf
-  ([] vec/zero-segment)
+  ([] seg/zero)
   ([s] s)
   ([s v]
-   (if (identical? s vec/zero-segment)
+   (if (identical? s seg/zero)
      (Segment. v v)
      (Segment.
       (Vec2. (min (.-x (.-a s)) (.-x v)) (min (.-y (.-a s)) (.-y v)))
@@ -236,6 +246,35 @@
 (defmethod object-bounding-rect :note/note
   [{src :object/point}]
   (Segment. src (vec/shift src 42)))
+
+(defmethod object-bounding-rect :prop/prop
+  [{point :object/point
+    scale :object/scale
+    rotation :object/rotation
+    {width :image/width
+     height :image/height} :prop/image}]
+  (let [bound (Segment. point (vec/shift point width height))
+        xform (-> matrix/identity
+                  (matrix/translate (seg/midpoint bound))
+                  (matrix/scale scale)
+                  (matrix/rotate rotation)
+                  (matrix/translate (vec/mul (seg/midpoint bound) -1)))]
+    (bounding-rect (map xform (rect-points bound)))))
+
+(defmulti object-transform :object/type)
+
+(defmethod object-transform :default []
+  matrix/identity)
+
+(defmethod object-transform :prop/prop
+  [{scale :object/scale rotation :object/rotation
+    {width :image/width height :image/height} :prop/image}]
+  (let [bounds (Segment. vec/zero (Vec2. width height))
+        center (seg/midpoint bounds)]
+    (-> (matrix/translate matrix/identity center)
+        (matrix/scale (or scale 1))
+        (matrix/rotate (or rotation 0))
+        (matrix/translate (vec/mul center -1)))))
 
 (defmulti object-tile-path
   (fn [object _ _]

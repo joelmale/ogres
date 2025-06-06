@@ -4,6 +4,8 @@
             [clojure.string :refer [trim]]
             [ogres.app.const :refer [grid-size half-size]]
             [ogres.app.geom :as geom]
+            [ogres.app.matrix :as matrix]
+            [ogres.app.segment :as seg]
             [ogres.app.vec :as vec :refer [Vec2]]))
 
 (def ^:private suffix-max-xf
@@ -183,8 +185,8 @@
      (case (count args)
        0 [[:db.fn/call event-tx-fn event 1]]
        1 (let [[scale] args
-               bounds (or (:user/bounds user) vec/zero-segment)]
-           [[:db.fn/call event-tx-fn event scale (vec/midpoint bounds)]])
+               bounds (or (:user/bounds user) seg/zero)]
+           [[:db.fn/call event-tx-fn event scale (seg/midpoint bounds)]])
        (let [[next-scale point] args
              {{id :db/id scale :camera/scale camera :camera/point} :user/camera} user]
          [{:db/id id
@@ -202,7 +204,7 @@
   event-tx-fn :camera/zoom-delta
   [data _ mx my delta trackpad?]
   (let [user (ds/entity data [:db/ident :user])
-        bound (or (:user/bounds user) vec/zero-segment)
+        bound (or (:user/bounds user) seg/zero)
         scale (linear -400 400 -0.50 0.50)
         delta (if trackpad? (scale (* -1 8 delta)) (scale (* -1 2 delta)))
         point (vec/sub (Vec2. mx my) (.-a bound))
@@ -455,7 +457,7 @@
             (cond
               (and align? (= (:object/type entity) :token/token))
               (let [bounds (vec/rnd (vec/add (geom/object-bounding-rect entity) delta) grid-size)]
-                {:db/id id :object/point (vec/midpoint bounds)})
+                {:db/id id :object/point (seg/midpoint bounds)})
               (and align? (not= (:object/type entity) :note/note))
               (let [round (geom/object-alignment entity)]
                 {:db/id id :object/point (vec/rnd (vec/add point delta) round)})
@@ -485,18 +487,52 @@
        {:db/id camera :camera/selected {:db/id id}})]))
 
 (defmethod
-  ^{:doc "Toggle the visibility of the given object."}
+  ^{:doc "Hide or reveal the given object."}
   event-tx-fn :objects/toggle-hidden
   [data _ id]
   (let [entity (ds/entity data id)]
     [[:db/add id :object/hidden (not (:object/hidden entity))]]))
 
 (defmethod
-  ^{:doc "Change the visibility of the given objects."}
-  event-tx-fn :objects/change-hidden
-  [_ _ idxs value]
-  (for [id idxs]
-    [:db/add id :object/hidden value]))
+  ^{:doc "Hides or reveals the currently selected objects."}
+  event-tx-fn :objects/toggle-hidden-selected
+  [data _]
+  (let [user (ds/entity data [:db/ident :user])
+        selected (:camera/selected (:user/camera user))]
+    (for [{id :db/id} selected]
+      [:db/add id :object/hidden (not (every? :object/hidden selected))])))
+
+(defmethod
+  ^{:doc "Locks or unlocks the currently selected objects."}
+  event-tx-fn :objects/toggle-locked-selected
+  [data _]
+  (let [user (ds/entity data [:db/ident :user])
+        selected (:camera/selected (:user/camera user))]
+    (for [{id :db/id} selected]
+      [:db/add id :object/locked (not (every? :object/locked selected))])))
+
+(defmethod
+  ^{:doc "Resets all transformations for the currently selected objects."}
+  event-tx-fn :objects/reset-transform-selected
+  [data _]
+  (let [user (ds/entity data [:db/ident :user])]
+    (into
+     [] cat
+     (for [{id :db/id} (:camera/selected (:user/camera user))]
+       [[:db/retract id :object/scale]
+        [:db/retract id :object/rotation]]))))
+
+(defmethod
+  ^{:doc "Change the scaling of the given object."}
+  event-tx-fn :object/change-scale
+  [_ _ id scale]
+  [[:db/add id :object/scale scale]])
+
+(defmethod
+  ^{:doc "Change the rotation of the given object."}
+  event-tx-fn :object/change-rotation
+  [_ _ id rotation]
+  [[:db/add id :object/rotation rotation]])
 
 (defmethod
   ^{:doc "Removes the objects given by idxs."}
@@ -504,6 +540,14 @@
   [_ _ idxs]
   (for [id idxs]
     [:db/retractEntity id]))
+
+(defmethod
+  ^{:doc "Removes all currently currently selected objects."}
+  event-tx-fn :objects/remove-selected
+  [data _]
+  (let [user (ds/entity data [:db/ident :user])]
+    (for [{id :db/id} (:camera/selected (:user/camera user))]
+      [:db/retractEntity id])))
 
 (defmethod
   ^{:doc "Updates the attribute for the objects given by idxs to the
@@ -592,22 +636,24 @@
   (let [result (ds/entity data [:db/ident :root])
         {{{{tokens :scene/tokens
             shapes :scene/shapes
-            notes  :scene/notes} :camera/scene
+            notes  :scene/notes
+            props  :scene/props} :camera/scene
            camera :db/id} :user/camera
           type :user/type} :root/user
          {conns :session/conns} :root/session} result
         bounds (geom/bounding-rect (seq rect))
-        locked (into #{} (comp (mapcat :user/dragging) (map :db/id)) conns)]
+        occupied (into #{} (comp (mapcat :user/dragging) (map :db/id)) conns)]
     [{:db/id camera
       :camera/draw-mode :select
       :camera/selected
-      (for [entity (concat shapes tokens notes)
+      (for [entity (concat shapes tokens notes props)
             :let   [{id :db/id} entity]
             :let   [object (geom/object-bounding-rect entity)]
-            :when  (and (geom/rect-intersects-rect object bounds)
-                        (not (locked id))
-                        (or (= type :host) (not (:object/locked entity)))
-                        (or (= type :host) (not (:object/hidden entity))))]
+            :when  (and (not (occupied id))
+                        (not (and (= type :conn) (:object/hidden entity)))
+                        (not (and (= type :conn) (= (:object/type entity) :note/note)))
+                        (not (and (= type :conn) (= (:object/type entity) :prop/prop)))
+                        (geom/rect-intersects-rect object bounds))]
         {:db/id id})}]))
 
 (defmethod event-tx-fn :selection/clear
@@ -867,7 +913,7 @@
   event-tx-fn :session/focus
   [data]
   (let [select-w [:camera/scene [:camera/point :default vec/zero] [:camera/scale :default 1]]
-        select-l [:db/id [:user/bounds :default vec/zero-segment]
+        select-l [:db/id [:user/bounds :default seg/zero]
                   {:user/cameras [:camera/scene] :user/camera select-w}]
         select-s [{:session/host select-l} {:session/conns select-l}]
         result   (ds/pull data select-s [:db/ident :session])
@@ -876,14 +922,14 @@
           host :user/camera} :session/host
          conns :session/conns} result
         scale (:camera/scale host)
-        center (vec/add point (vec/div (vec/midpoint bounds) scale))]
+        center (vec/add point (vec/div (seg/midpoint bounds) scale))]
     (->> (for [[next conn] (sequence (indexed) conns)
                :let [prev (->> (:user/cameras conn)
                                (filter (fn [conn]
                                          (= (:db/id (:camera/scene conn))
                                             (:db/id (:camera/scene host))))) (first) (:db/id))
                      next  (or prev next)
-                     point (vec/sub center (vec/div (vec/midpoint (:user/bounds conn)) scale))]]
+                     point (vec/sub center (vec/div (seg/midpoint (:user/bounds conn)) scale))]]
            [{:db/id (:db/id conn) :user/camera next :user/cameras next}
             {:db/id next
              :camera/point point
@@ -897,6 +943,8 @@
    :object/type
    :object/hidden
    :object/locked
+   :object/scale
+   :object/rotation
    :note/icon
    :note/label
    :note/description
@@ -908,13 +956,16 @@
    :token/light
    :token/size
    :token/aura-radius
-   :token/image])
+   :token/image
+   :prop/image])
 
 (def ^:private clipboard-copy-select
   [{:user/camera
     [{:camera/selected
       (into clipboard-copy-attrs
-            [:db/id {:token/image [:image/hash]}])}]}])
+            [:db/id
+             {:prop/image [:image/hash]}
+             {:token/image [:image/hash]}])}]}])
 
 (defmethod
   ^{:doc "Copy the currently selected objects to the clipboard. Optionally
@@ -938,7 +989,7 @@
 (def ^:private clipboard-paste-select
   [{:root/user
     [[:user/clipboard :default []]
-     [:user/bounds :default vec/zero-segment]
+     [:user/bounds :default seg/zero]
      {:user/camera
       [:db/id
        [:camera/scale :default 1]
@@ -946,7 +997,8 @@
        {:camera/scene
         [:db/id
          [:scene/grid-align :default false]]}]}]}
-   {:root/token-images [:image/hash]}])
+   {:root/token-images [:image/hash]}
+   {:root/props-images [:image/hash]}])
 
 (defmethod
   ^{:doc "Creates objects on the current scene from the data stored in the
@@ -963,31 +1015,42 @@
            point :camera/point
            {scene :db/id align? :scene/grid-align}
            :camera/scene} :user/camera} :root/user
-         images :root/token-images} result
-        hashes (into #{} (map :image/hash) images)
+         token-images :root/token-images
+         props-images :root/props-images} result
+        props-hashes (into #{} (map :image/hash) props-images)
+        token-hashes (into #{} (map :image/hash) token-images)
+        pastable-xf
+        (filter
+         (fn [data]
+           (or (not= (:object/type data) :prop/prop)
+               (props-hashes (:image/hash (:prop/image data))))))
         bound (transduce (mapcat geom/object-bounding-rect) geom/bounding-rect-rf clipboard)
         delta (vec/sub
-               (vec/add point (vec/div (vec/midpoint screen) scale))
-               (vec/midpoint bound))]
-    (for [[idx copy] (sequence (indexed) clipboard)
-          :let [{src :object/point type :object/type} copy
-                hash (:image/hash (:token/image copy))
-                type (keyword (namespace type))
-                data (cond-> (assoc copy :db/id idx :object/point (vec/add src delta))
+               (vec/add point (vec/div (seg/midpoint screen) scale))
+               (seg/midpoint bound))]
+    (for [[idx copy] (sequence (comp pastable-xf (indexed)) clipboard)
+          :let [{point :object/point
+                 {hash-prop :image/hash} :prop/image
+                 {hash-token :image/hash} :token/image} copy
+                type (keyword (namespace (:object/type copy)))
+                data (cond-> (assoc copy :db/id idx :object/point (vec/add point delta))
                        align?
-                       (assoc :object/point (vec/rnd (vec/add src delta) grid-size))
-                       (and (= type :token) (hashes hash))
-                       (assoc :token/image [:image/hash (hashes hash)])
+                       (assoc :object/point (vec/rnd (vec/add point delta) grid-size))
+                       (and (= type :prop) (props-hashes hash-prop))
+                       (assoc :prop/image [:image/hash (props-hashes hash-prop)])
+                       (and (= type :token) (token-hashes hash-token))
+                       (assoc :token/image [:image/hash (token-hashes hash-token)])
                        (and (= type :token) align?)
                        (assoc :object/point
                               (let [bounds (geom/object-bounding-rect copy)
                                     aligns (vec/rnd (vec/add bounds delta) grid-size)]
-                                (vec/midpoint aligns))))]]
+                                (seg/midpoint aligns))))]]
       {:db/id camera
        :camera/selected idx
        :camera/scene
        (cond-> {:db/id scene}
          (= type :note)  (assoc :scene/notes data)
+         (= type :prop)  (assoc :scene/props data)
          (= type :shape) (assoc :scene/shapes data)
          (= type :token) (assoc :scene/tokens data))})))
 
@@ -1043,8 +1106,7 @@
           (vec/shift -16)
           (vec/rnd))
       :object/hidden true
-      :object/locked true
-      :note/label "Note"}
+      :object/locked false}
      {:db/id scene :scene/notes -1}
      {:db/id camera :camera/selected -1 :camera/draw-mode :select}]))
 
@@ -1076,3 +1138,84 @@
     [[:db/add id :note/label label]
      [:db/add id :note/description desc]
      [:db/retract (:db/id (:user/camera user)) :camera/selected id]]))
+
+;; --- Props Images ---
+
+(defmethod
+  ^{:doc "Creates state representations of images used as props which
+          include metadata like image dimensions, filename, and their
+          thumbnails. Uniquely identified by their SHA-1 hash digest."}
+  event-tx-fn :props-images/create-many
+  [_ _ images]
+  (into
+   [{:db/ident :root
+     :root/props-images
+     (for [[{:keys [hash name size width height]} _] images]
+       {:image/hash hash
+        :image/name name
+        :image/size size
+        :image/width width
+        :image/height height})}] cat
+   (for [[image thumbnail] images]
+     (if (= (:hash image) (:hash thumbnail))
+       [{:image/hash (:hash image) :image/thumbnail [:image/hash (:hash image)]}]
+       [{:image/hash (:hash thumbnail)
+         :image/name (:name thumbnail)
+         :image/size (:size thumbnail)
+         :image/width (:width thumbnail)
+         :image/height (:height thumbnail)}
+        {:image/hash (:hash image) :image/thumbnail [:image/hash (:hash thumbnail)]}]))))
+
+(defmethod
+  ^{:doc "Removes all prop images as well as any props from all scenes."}
+  event-tx-fn :props-images/remove-all
+  [data _ _]
+  (let [user (ds/entity data [:db/ident :user])
+        xfrm (comp (map :camera/scene) (mapcat :scene/props) (map :db/id))]
+    (into [[:db/retract [:db/ident :root] :root/props-images]]
+          (for [id (sequence xfrm (:user/cameras user))]
+            [:db/retractEntity id]))))
+
+(defmethod
+  ^{:doc "Removes a prop image as well as any instances of that image
+          in all scenes."}
+  event-tx-fn :props-images/remove
+  [data _ hash]
+  (let [user (ds/entity data [:db/ident :user])
+        xfrm (comp
+              (mapcat (comp :scene/props :camera/scene))
+              (filter (comp #{hash} :image/hash :prop/image)))]
+    (into [[:db/retractEntity [:image/hash hash]]]
+          (for [entity (sequence xfrm (:user/cameras user))]
+            [:db/retractEntity (:db/id entity)]))))
+
+;; --- Props ---
+
+(defmethod
+  ^{:doc "Creates a new prop image in the current scene at the given
+          screen-space point."}
+  event-tx-fn :props/create
+  [data _ point hash]
+  (let [{{bounds :user/bounds
+          {camera-point :camera/point
+           camera-scale :camera/scale
+           camera-id :db/id
+           {scene-id :db/id}
+           :camera/scene}
+          :user/camera} :root/user}
+        (ds/entity data [:db/ident :root])
+        {width :image/width
+         height :image/height}
+        (ds/entity data [:image/hash hash])
+        xform
+        (-> (matrix/translate matrix/identity camera-point)
+            (matrix/translate (/ width -2) (/ height -2))
+            (matrix/scale (/ (or camera-scale 1)))
+            (matrix/translate (vec/mul (.-a bounds) -1)))]
+    (if (geom/point-within-rect? point bounds)
+      [[:db/add -1 :object/point (xform point)]
+       [:db/add -1 :object/type :prop/prop]
+       [:db/add -1 :prop/image [:image/hash hash]]
+       [:db/add camera-id :camera/selected -1]
+       [:db/add scene-id :scene/props -1]]
+      [])))

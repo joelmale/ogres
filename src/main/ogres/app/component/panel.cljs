@@ -5,6 +5,7 @@
             [ogres.app.component.panel-lobby :as lobby]
             [ogres.app.component.panel-scene :as scene]
             [ogres.app.component.panel-tokens :as tokens]
+            [ogres.app.component.panel-props :as props]
             [ogres.app.component.panel-dice-roller :as dice-roller]
             [ogres.app.hooks :as hooks]
             [uix.core :refer [defui $]]))
@@ -34,12 +35,13 @@
   {:data       {:icon "wrench-adjustable-circle" :label "Manage local data"}
    :initiative {:icon "hourglass-split" :label "Initiative"}
    :lobby      {:icon "people-fill" :label "Online options"}
-   :scene      {:icon "images" :label "Scene options"}
-   :tokens     {:icon "person-circle" :label "Tokens"}
+   :scene      {:icon "easel" :label "Scene options"}
+   :tokens     {:icon "person-circle" :label "Token images"}
+   :props      {:icon "images" :label "Prop images"}
    :dice-roller{:icon "dice-cup" :label "Dice"}})
 
 (def ^:private panel-forms
-  {:host [:tokens :scene :initiative :dice-roller :lobby :data] 
+  {:host [:tokens :scene :props :initiative :dice-roller :lobby :data] 
    :conn [:tokens :initiative :dice-roller :lobby]})
 
 (def ^:private components
@@ -48,6 +50,7 @@
    :lobby      {:form lobby/form :footer lobby/footer}
    :scene      {:form scene/form}
    :tokens     {:form tokens/form :footer tokens/footer}
+   :props      {:form props/panel :footer props/footer}
    :dice-roller{:form dice-roller/panel-content}
    })
 
@@ -83,7 +86,7 @@
                  :value key
                  :checked (and expanded selected)
                  :on-change #(dispatch :user/select-panel key)})
-              ($ icon {:name (:icon data) :size 20}))))
+              ($ icon {:name (:icon data) :size 22}))))
         ($ :li.panel-tabs-control
           {:role "tab" :on-click #(dispatch :user/toggle-panel)}
           ($ :button {:type "button" :aria-label "Collapse or expand"}

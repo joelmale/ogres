@@ -57,7 +57,37 @@
       }
     }
 
+    .context-menu-action {
+      align-items: center;
+      aspect-ratio: 1;
+      border-radius: 2px;
+      color: var(--color-black-400);
+      display: flex;
+      justify-content: center;
+      width: 36px;
+
+      &:has(:checked) {
+        color: var(--color-danger-500);
+      }
+
+      &:has(:not(:disabled)) {
+        cursor: pointer;
+      }
+
+      &:has(:disabled) {
+        color: var(--color-black-500);
+      }
+
+      &:has(:focus-visible) {
+        outline: 1px solid var(--outline-color);
+        outline-offset: 1px;
+        z-index: 1;
+      }
+    }
+
     .context-menu-main {
+      display: flex;
+      flex-direction: column;
       flex: 1;
       pointer-events: all;
 
@@ -78,6 +108,7 @@
       .context-menu-toolbar {
         border-radius: 3px 0 0 3px;
         border-width: 1px 0 1px 1px;
+        flex: 1;
       }
 
       .context-menu-form {
@@ -98,6 +129,10 @@
         pointer-events: all;
       }
     }
+  }
+
+  &:is([data-type="shape"]) .context-menu {
+    min-width: 340px;
   }
 
   .context-menu-form-label {
